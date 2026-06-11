@@ -22,6 +22,7 @@ the full diagnosis and fix.
 | Hot symbol's DSO column shows a `.so` file (not the application binary); symbol appears in `references/library-versions.md` | Library version upgrade | `patterns/library-version-upgrade.md` |
 | `crc32b`/`crc32q`/`pclmulqdq` instructions dominate a hot function; or a function named `crc32c`/`crc32_c`/`compute_crc32c` is prominent; single-accumulator CRC32 loop | Fast CRC32C | `patterns/fast-crc32c.md` |
 | `futex_wake`, `try_to_wake_up`, `__pthread_cond_broadcast` hot; context-switch rate scales with thread count; IPC collapse with high CPU utilization | CV thundering herd | `patterns/cv-thundering-herd.md` |
+| `osq_lock`, `mutex_lock`, `__mutex_lock_slowpath` (kernel) or `pthread_mutex_lock`, `__lll_lock_wait`, `futex_wait`/`futex_wake` (user-space) prominent; critical section is read-heavy (lookup/search); IPC drops with core count | Mutex to rwlock | `patterns/mutex-to-rwlock.md` |
 | Hot function name matches a known algorithm (`hamming_distance`, `hamming_dist`, `cosine_similarity`, `jaccard_distance`, …) | Known algorithm — optimized SIMD replacement available | `references/known-algorithms-impl.md` |
 | `std::sort`, `_introsort_loop`, `__gnu_cxx::__ops` hot in profile; data type is `float`, `double`, `int32_t`, `uint32_t`, `int64_t`, or `uint64_t` | SIMD sort | `patterns/simd-sort.md` |
 
@@ -183,6 +184,28 @@ not useful work. Key differentiator from lock contention: `perf lock stat`
 shows normal hold/wait times.
 
 Read `patterns/cv-thundering-herd.md`.
+
+---
+
+### Mutex to rwlock
+
+**Kernel mutex**: `perf report` shows `osq_lock` (the kernel mutex Optimistic
+Spin Queue), `mutex_lock`, or `__mutex_lock_slowpath` consuming significant
+cycles, with cycle count growing as core count increases.
+
+**User-space pthread mutex**: `perf report` shows `pthread_mutex_lock` /
+`__lll_lock_wait` on the lock path and `futex_wait` / `futex_wake` in the
+kernel slow path. Context-switch rate scales with thread count as threads
+sleep and wake on the futex.
+
+In both cases, the call chain traces to a mutex protecting a lookup, search,
+or status-check operation that rarely modifies data. `perf lock stat` confirms
+high `contentions` relative to `acquisitions` and `wait_total` >> `hold_total`.
+IPC degrades with core count even though user-space work remains constant —
+the incremental cycles are pure lock serialization overhead from readers
+blocking each other.
+
+Read `patterns/mutex-to-rwlock.md`.
 
 ---
 
