@@ -23,6 +23,7 @@ the full diagnosis and fix.
 | `crc32b`/`crc32q`/`pclmulqdq` instructions dominate a hot function; or a function named `crc32c`/`crc32_c`/`compute_crc32c` is prominent; single-accumulator CRC32 loop | Fast CRC32C | `patterns/fast-crc32c.md` |
 | `futex_wake`, `try_to_wake_up`, `__pthread_cond_broadcast` hot; context-switch rate scales with thread count; IPC collapse with high CPU utilization | CV thundering herd | `patterns/cv-thundering-herd.md` |
 | `osq_lock`, `mutex_lock`, `__mutex_lock_slowpath` (kernel) or `pthread_mutex_lock`, `__lll_lock_wait`, `futex_wait`/`futex_wake` (user-space) prominent; critical section is read-heavy (lookup/search); IPC drops with core count | Mutex to rwlock | `patterns/mutex-to-rwlock.md` |
+| One header-byte / first-word load (`movsbl`, `movzbl`, `mov`) dominates `perf annotate` inside a stride-predictable scan (60–90% of scan samples); memory-latency Top-Down bucket dominates the scan region; `perf c2c` shows no HITM | Software prefetch (latency-exposed scan) | `patterns/software-prefetch.md` |
 | Hot function name matches a known algorithm (`hamming_distance`, `hamming_dist`, `cosine_similarity`, `jaccard_distance`, …) | Known algorithm — optimized SIMD replacement available | `references/known-algorithms-impl.md` |
 | `std::sort`, `_introsort_loop`, `__gnu_cxx::__ops` hot in profile; data type is `float`, `double`, `int32_t`, `uint32_t`, `int64_t`, or `uint64_t` | SIMD sort | `patterns/simd-sort.md` |
 
@@ -220,3 +221,23 @@ The application code itself is not the bottleneck. The gain comes from the
 library update, not from any source change.
 
 Read `patterns/library-version-upgrade.md`.
+
+---
+
+### Software prefetch (latency-exposed scan)
+
+`perf annotate` on a stride-predictable scan symbol concentrates 60–90%
+of samples on a single early instruction — typically `movsbl` / `movzbl`
+loading a per-row flag byte at row start, or a `mov` loading a fixed
+header offset. The surrounding compare / branch / offset-add / store
+instructions each carry only a few percent. The memory-latency bucket
+of a Top-Down profile dominates the scan region (event names differ per
+microarchitecture — consult the target CPU's PMU reference). Last-level
+cache miss rate per retired load is elevated on the scan symbol; `perf
+c2c` shows *no* HITM (single-writer DRAM latency, not cache-line
+contention). Whether the hardware prefetcher covers this loop shape
+depends on the target CPU — confirm with a stream microbenchmark such
+as `prefetch-bench` before adding the hint. If those signals are absent
+the pattern does not apply on this target.
+
+Read `patterns/software-prefetch.md`.

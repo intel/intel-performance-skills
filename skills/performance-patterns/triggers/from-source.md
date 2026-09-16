@@ -24,6 +24,7 @@ structure alone is a strong predictor of the performance problem.
 | Hot function calls error-reporters / rare-case handlers without `[[gnu::cold]]` or `__attribute__((cold))` | Cold-path annotation | `patterns/cold-path-annotation.md` |
 | `pthread_cond_broadcast` / `cv.notify_all()` waking a thread pool; `notify_one()` in a loop waking N threads; dispatcher wakes all threads regardless of job count | CV thundering herd | `patterns/cv-thundering-herd.md` |
 | `mutex_lock()` / `pthread_mutex_lock()` guarding a lookup, search, or cache read where writes are rare (<25% of acquisitions) | Mutex to rwlock | `patterns/mutex-to-rwlock.md` |
+| Stride-predictable scan (fixed row size, sequential walk) inside a batched producer-consumer loop; working set >> L3; no `__builtin_prefetch` on the row stream | Software prefetch (latency-exposed scan) | `patterns/software-prefetch.md` |
 | Function/loop named or described as a known algorithm (`hamming_distance`, `cosine_similarity`, `jaccard_distance`, `iou`, …) | Known algorithm — optimized SIMD replacement available | `references/known-algorithms-impl.md` |
 | `std::sort`, `std::nth_element`, `std::partial_sort`, or `qsort` called on `float` / `double` / `int32_t` / `uint32_t` / `int64_t` / `uint64_t` arrays | SIMD sort | `patterns/simd-sort.md` |
 | Function/loop named `crc32c` / `crc32_c` / `compute_crc32c`; single `_mm_crc32_u64` accumulator variable; byte-by-byte table-lookup CRC32C loop | Fast CRC32C | `patterns/fast-crc32c.md` |
@@ -242,3 +243,28 @@ Recognizable by: a hot function whose body contains `if (error_condition)
 carries no cold annotation.
 
 Read `patterns/cold-path-annotation.md`.
+
+---
+
+### Software prefetch (latency-exposed scan)
+
+A stride-predictable scan (fixed row size, sequential walk over a large
+allocation range) that lives inside a *batched* producer-consumer loop —
+the scan fills a small batch of pointers, hands the batch to a consumer,
+then resumes. Common shape: `for (row = 0; row + rowSize <= limit; row +=
+rowSize) { ...header check...; rows[count++] = data + row; if (count ==
+kBatch) hand_off(); }`. The hardware prefetcher's run-ahead is bounded
+per batch and can be further shortened by small per-element work — the
+first load of each record (typically a header-byte flag check) can stall
+on DRAM latency even though the stride is trivial. A one-line
+`__builtin_prefetch(&data[i + N])` at a tuned N (2 KiB is a reasonable
+starting point) restores the run-ahead. Applies only when the next load
+address is derivable from the *index* (a stride); a pointer-chase
+(`p = p->next`) is a different problem — the stride prefetch cannot
+compute the next address there. Whether it helps depends on the target
+CPU's hardware prefetcher coverage of this loop shape — measure before
+committing (`prefetch-bench` is a ready-made stream microbenchmark for
+this check). Guard the hint with `#if defined(__x86_64__)` so it ships
+only to the ISA where it has been measured.
+
+Read `patterns/software-prefetch.md`.
