@@ -11,9 +11,10 @@ description: >-
   request to write a fast reduction, dot product, or CPU-dispatched function.
   Patterns: serial accumulator, TTAS spinlock, SIMD upconversion (zipper),
   false sharing, per-CPU stats, missing vzeroupper, missing restrict,
-  cv-thundering-herd, mutex-to-rwlock, CPU dispatch, library version upgrade,
-  fast CRC32C, known algorithms (Cosine Similarity, Hamming Distance,
-  Jaccard Distance), SIMD sort (x86-simd-sort).
+  cv-thundering-herd, mutex-to-rwlock, MLP chain walk (pointer-chase K-way
+  interleave), CPU dispatch, library version upgrade, fast CRC32C, known
+  algorithms (Cosine Similarity, Hamming Distance, Jaccard Distance), SIMD
+  sort (x86-simd-sort).
 ---
 
 <!-- (C) 2026 Intel Corporation, MIT license -->

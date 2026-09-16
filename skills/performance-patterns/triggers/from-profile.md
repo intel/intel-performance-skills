@@ -23,6 +23,7 @@ the full diagnosis and fix.
 | `crc32b`/`crc32q`/`pclmulqdq` instructions dominate a hot function; or a function named `crc32c`/`crc32_c`/`compute_crc32c` is prominent; single-accumulator CRC32 loop | Fast CRC32C | `patterns/fast-crc32c.md` |
 | `futex_wake`, `try_to_wake_up`, `__pthread_cond_broadcast` hot; context-switch rate scales with thread count; IPC collapse with high CPU utilization | CV thundering herd | `patterns/cv-thundering-herd.md` |
 | `osq_lock`, `mutex_lock`, `__mutex_lock_slowpath` (kernel) or `pthread_mutex_lock`, `__lll_lock_wait`, `futex_wait`/`futex_wake` (user-space) prominent; critical section is read-heavy (lookup/search); IPC drops with core count | Mutex to rwlock | `patterns/mutex-to-rwlock.md` |
+| One dependent-load instruction (`mov <off>(%reg), %reg`) dominates `perf annotate` inside a chain-walk symbol; high last-level-cache miss rate on that symbol; memory-latency Top-Down bucket dominates; IPC ≪ 1 with no HITM (single-writer latency, not contention) | MLP chain walk (K-way interleaved) | `patterns/mlp-chain-walk.md` |
 | Hot function name matches a known algorithm (`hamming_distance`, `hamming_dist`, `cosine_similarity`, `jaccard_distance`, …) | Known algorithm — optimized SIMD replacement available | `references/known-algorithms-impl.md` |
 | `std::sort`, `_introsort_loop`, `__gnu_cxx::__ops` hot in profile; data type is `float`, `double`, `int32_t`, `uint32_t`, `int64_t`, or `uint64_t` | SIMD sort | `patterns/simd-sort.md` |
 
@@ -220,3 +221,22 @@ The application code itself is not the bottleneck. The gain comes from the
 library update, not from any source change.
 
 Read `patterns/library-version-upgrade.md`.
+
+---
+
+### MLP chain walk (K-way interleaved)
+
+`perf annotate` on the hot walk symbol shows a single dependent load
+instruction (`mov <off>(%reg), %reg2`, typically the `p->next` fetch)
+accumulating most of the samples. `perf stat` on the walk region shows IPC
+well below 1.0, high last-level-cache miss rate per retired load, and
+the memory-latency bucket of a Top-Down profile as the dominant back-end
+stall component (event names differ per microarchitecture — consult the
+target CPU's PMU reference).
+Crucially, `perf c2c` shows no HITM — this is single-writer, single-reader
+DRAM latency, not cache-line contention. If a random-shuffled chain
+microbenchmark (see `ptr-chase-latency`) reports ~the same per-node time at
+the same working set, the loop *is* running at flat DRAM latency and MLP
+interleaving can hide most of it.
+
+Read `patterns/mlp-chain-walk.md`.

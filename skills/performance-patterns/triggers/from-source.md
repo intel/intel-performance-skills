@@ -24,6 +24,7 @@ structure alone is a strong predictor of the performance problem.
 | Hot function calls error-reporters / rare-case handlers without `[[gnu::cold]]` or `__attribute__((cold))` | Cold-path annotation | `patterns/cold-path-annotation.md` |
 | `pthread_cond_broadcast` / `cv.notify_all()` waking a thread pool; `notify_one()` in a loop waking N threads; dispatcher wakes all threads regardless of job count | CV thundering herd | `patterns/cv-thundering-herd.md` |
 | `mutex_lock()` / `pthread_mutex_lock()` guarding a lookup, search, or cache read where writes are rare (<25% of acquisitions) | Mutex to rwlock | `patterns/mutex-to-rwlock.md` |
+| Loop walks a dependent-pointer chain (`p = p->next`, hash-table collision chain, tree probe) one node at a time; caller has a batch of independent probes available | MLP chain walk (K-way interleaved) | `patterns/mlp-chain-walk.md` |
 | Function/loop named or described as a known algorithm (`hamming_distance`, `cosine_similarity`, `jaccard_distance`, `iou`, …) | Known algorithm — optimized SIMD replacement available | `references/known-algorithms-impl.md` |
 | `std::sort`, `std::nth_element`, `std::partial_sort`, or `qsort` called on `float` / `double` / `int32_t` / `uint32_t` / `int64_t` / `uint64_t` arrays | SIMD sort | `patterns/simd-sort.md` |
 | Function/loop named `crc32c` / `crc32_c` / `compute_crc32c`; single `_mm_crc32_u64` accumulator variable; byte-by-byte table-lookup CRC32C loop | Fast CRC32C | `patterns/fast-crc32c.md` |
@@ -242,3 +243,19 @@ Recognizable by: a hot function whose body contains `if (error_condition)
 carries no cold annotation.
 
 Read `patterns/cold-path-annotation.md`.
+
+---
+
+### MLP chain walk (K-way interleaved)
+
+A loop of the form `while (p) { ...; p = p->next; }` walking a hash-table
+collision chain, linked list, tree probe, or skip list. Each iteration issues
+a load whose address comes from the *result* of the previous iteration's load —
+a true pointer-chase — so the CPU issues one DRAM miss at a time even though
+the core can hold ~10–20 outstanding misses. When the caller holds a batch of
+independent probes (probe rows, keys, chain heads), interleaving K such walks
+in flight simultaneously turns a latency-bound loop into a memory-level-
+parallelism (MLP) bound one — no `__builtin_prefetch` hint is required or
+sufficient; the fix is a change of loop-carried dependency structure.
+
+Read `patterns/mlp-chain-walk.md`.
