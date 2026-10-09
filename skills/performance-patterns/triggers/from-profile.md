@@ -23,6 +23,7 @@ the full diagnosis and fix.
 | `crc32b`/`crc32q`/`pclmulqdq` instructions dominate a hot function; or a function named `crc32c`/`crc32_c`/`compute_crc32c` is prominent; single-accumulator CRC32 loop | Fast CRC32C | `patterns/fast-crc32c.md` |
 | `futex_wake`, `try_to_wake_up`, `__pthread_cond_broadcast` hot; context-switch rate scales with thread count; IPC collapse with high CPU utilization | CV thundering herd | `patterns/cv-thundering-herd.md` |
 | `osq_lock`, `mutex_lock`, `__mutex_lock_slowpath` (kernel) or `pthread_mutex_lock`, `__lll_lock_wait`, `futex_wait`/`futex_wake` (user-space) prominent; critical section is read-heavy (lookup/search); IPC drops with core count | Mutex to rwlock | `patterns/mutex-to-rwlock.md` |
+| One dependent load (`mov (%reg), %reg`) dominates annotate in a chain walk; high LLC misses; IPC ≪ 1; no HITM | MLP chain walk | `patterns/mlp-chain-walk.md` |
 | Hot function name matches a known algorithm (`hamming_distance`, `hamming_dist`, `cosine_similarity`, `jaccard_distance`, …) | Known algorithm — optimized SIMD replacement available | `references/known-algorithms-impl.md` |
 | `std::sort`, `_introsort_loop`, `__gnu_cxx::__ops` hot in profile; data type is `float`, `double`, `int32_t`, `uint32_t`, `int64_t`, or `uint64_t` | SIMD sort | `patterns/simd-sort.md` |
 
@@ -218,3 +219,14 @@ The application code itself is not the bottleneck. The gain comes from the
 library update, not from any source change.
 
 Read `patterns/library-version-upgrade.md`.
+
+---
+
+### MLP chain walk
+
+Most walk-symbol samples sit on one dependent load (the `p->next` fetch);
+memory-latency Top-Down bucket dominant; no HITM. If
+`patterns/tests/mlp-chain-walk-bench.c` reports ~the same serial ns/step at
+the same working set, the loop runs at flat DRAM latency.
+
+Read `patterns/mlp-chain-walk.md`.
