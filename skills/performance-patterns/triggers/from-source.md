@@ -24,6 +24,7 @@ structure alone is a strong predictor of the performance problem.
 | Hot function calls error-reporters / rare-case handlers without `[[gnu::cold]]` or `__attribute__((cold))` | Cold-path annotation | `patterns/cold-path-annotation.md` |
 | `pthread_cond_broadcast` / `cv.notify_all()` waking a thread pool; `notify_one()` in a loop waking N threads; dispatcher wakes all threads regardless of job count | CV thundering herd | `patterns/cv-thundering-herd.md` |
 | `mutex_lock()` / `pthread_mutex_lock()` guarding a lookup, search, or cache read where writes are rare (<25% of acquisitions) | Mutex to rwlock | `patterns/mutex-to-rwlock.md` |
+| Fixed-stride sequential scan inside a batched producer-consumer loop; working set ≫ L3; no `__builtin_prefetch` | Software prefetch | `patterns/software-prefetch.md` |
 | Function/loop named or described as a known algorithm (`hamming_distance`, `cosine_similarity`, `jaccard_distance`, `iou`, …) | Known algorithm — optimized SIMD replacement available | `references/known-algorithms-impl.md` |
 | `std::sort`, `std::nth_element`, `std::partial_sort`, or `qsort` called on `float` / `double` / `int32_t` / `uint32_t` / `int64_t` / `uint64_t` arrays | SIMD sort | `patterns/simd-sort.md` |
 | Function/loop named `crc32c` / `crc32_c` / `compute_crc32c`; single `_mm_crc32_u64` accumulator variable; byte-by-byte table-lookup CRC32C loop | Fast CRC32C | `patterns/fast-crc32c.md` |
@@ -57,3 +58,6 @@ linked `patterns/*.md` file — don't re-derive it here.
   otherwise.
 - **Fast CRC32C** — name is a sufficient trigger even without inspecting the
   loop body; variants include `crc32c`, `crc32_c`, `calc_crc32c`, `hash_crc32c`.
+- **Software prefetch** — stride-derivable addresses only (not `p = p->next`);
+  measure with `patterns/tests/software-prefetch-bench.c` first — a flat
+  sweep means do not add the hint.
