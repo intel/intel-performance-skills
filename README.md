@@ -42,6 +42,7 @@ Once installed, you can talk to the agent naturally. A few examples:
 | `skills/linux-perf/` | Data collection skill: `perf` workflows, building blocks, hotspot reporting |
 | `skills/performance-patterns/` | Pattern detection and fix playbooks: source code and profiling signals |
 | `skills/phoronix-test-suite/` | Supporting skill: install, run, and optimize PTS benchmarks |
+| `skills/tma-drilldown/` | TMA drill-down: PMU event lookup, perf command generation, cross-platform comparison, iterative bottleneck identification |
 
 ---
 
@@ -112,6 +113,35 @@ Trigger: any `pts/<name>` reference, or the words *"phoronix"* / *"phoronix-test
 
 ---
 
+### `tma-drilldown` — TMA drill-down investigation
+
+**Automate Intel's Top-down Microarchitecture Analysis methodology with deterministic
+PMU event handling.**
+
+When the user needs to identify performance bottlenecks at the microarchitectural
+level, this skill provides:
+
+- **Event/metric lookup** — Search 2600+ PMU events and 300+ TMA metrics across 50+
+  Intel platforms
+- **Command generation** — Generate counter-budget-aware `perf stat` commands (knows
+  GP/fixed counter limits per platform)
+- **Cross-platform comparison** — Diff events and metrics between generations (e.g.,
+  ICX to SPR)
+- **TMA drill-down** — Iterative state-machine engine that walks the TMA tree from L1
+  (Frontend_Bound, Backend_Bound, Bad_Speculation, Retiring) to leaf nodes, generating
+  the right perf commands at each step and providing tuning guidance at the end
+
+Includes a Python CLI (`perfmon-skills`) and the Intel perfmon data repository as a git
+submodule. Complements `linux-perf` (which handles profiling data collection) by
+automating the structured TMA methodology. After bottleneck identification, delegates
+to `performance-patterns` for fix playbooks.
+
+Trigger phrases: *"TMA"*, *"Top-down Microarchitecture Analysis"*, *"PMU events"*,
+*"performance counters"*, *"which events to collect"*, *"counter budget"*,
+*"Frontend_Bound"*, *"Backend_Bound"*, *"platform comparison"*.
+
+---
+
 ## Installation
 
 This skill collection follows the open [Agent Skills standard](https://agentskills.io).
@@ -137,6 +167,7 @@ The easiest way to install across any supported agent. Requires
 gh skill install intel/intel-performance-skills linux-perf
 gh skill install intel/intel-performance-skills performance-patterns
 gh skill install intel/intel-performance-skills phoronix-test-suite
+gh skill install intel/intel-performance-skills tma-drilldown
 ```
 
 Keep them up to date:
@@ -145,6 +176,7 @@ Keep them up to date:
 gh skill update linux-perf
 gh skill update performance-patterns
 gh skill update phoronix-test-suite
+gh skill update tma-drilldown
 ```
 
 ### GitHub Copilot CLI
@@ -155,6 +187,7 @@ Skills are installed per-user under `~/.copilot/skills/`:
 cp -r skills/linux-perf ~/.copilot/skills/
 cp -r skills/performance-patterns ~/.copilot/skills/
 cp -r skills/phoronix-test-suite ~/.copilot/skills/
+cp -r skills/tma-drilldown ~/.copilot/skills/
 ```
 
 ### GitHub Copilot in VS Code
@@ -166,11 +199,11 @@ whole team benefits automatically:
 ```bash
 # Project-level (commit to your repository)
 mkdir -p .github/skills
-cp -r skills/linux-perf skills/performance-patterns skills/phoronix-test-suite \
+cp -r skills/linux-perf skills/performance-patterns skills/phoronix-test-suite skills/tma-drilldown \
     .github/skills/
 
 # User-level (available in every project)
-cp -r skills/linux-perf skills/performance-patterns skills/phoronix-test-suite \
+cp -r skills/linux-perf skills/performance-patterns skills/phoronix-test-suite skills/tma-drilldown \
     ~/.copilot/skills/
 ```
 
@@ -185,11 +218,11 @@ Claude Code discovers skills in `.claude/skills/` (project) or `~/.claude/skills
 ```bash
 # Project-level
 mkdir -p .claude/skills
-cp -r skills/linux-perf skills/performance-patterns skills/phoronix-test-suite \
+cp -r skills/linux-perf skills/performance-patterns skills/phoronix-test-suite skills/tma-drilldown \
     .claude/skills/
 
 # User-level
-cp -r skills/linux-perf skills/performance-patterns skills/phoronix-test-suite \
+cp -r skills/linux-perf skills/performance-patterns skills/phoronix-test-suite skills/tma-drilldown \
     ~/.claude/skills/
 ```
 
@@ -201,11 +234,11 @@ at user level:
 ```bash
 # Project-level
 mkdir -p .agents/skills
-cp -r skills/linux-perf skills/performance-patterns skills/phoronix-test-suite \
+cp -r skills/linux-perf skills/performance-patterns skills/phoronix-test-suite skills/tma-drilldown \
     .agents/skills/
 
 # User-level
-cp -r skills/linux-perf skills/performance-patterns skills/phoronix-test-suite \
+cp -r skills/linux-perf skills/performance-patterns skills/phoronix-test-suite skills/tma-drilldown \
     ~/.agents/skills/
 ```
 
@@ -215,7 +248,7 @@ Gemini CLI reads project skills from `.gemini/skills/`:
 
 ```bash
 mkdir -p .gemini/skills
-cp -r skills/linux-perf skills/performance-patterns skills/phoronix-test-suite \
+cp -r skills/linux-perf skills/performance-patterns skills/phoronix-test-suite skills/tma-drilldown \
     .gemini/skills/
 ```
 
@@ -225,7 +258,7 @@ OpenCode has native skill support and reads skills from `.opencode/skills/`:
 
 ```bash
 mkdir -p .opencode/skills
-cp -r skills/linux-perf skills/performance-patterns skills/phoronix-test-suite \
+cp -r skills/linux-perf skills/performance-patterns skills/phoronix-test-suite skills/tma-drilldown \
     .opencode/skills/
 ```
 

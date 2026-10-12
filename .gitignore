@@ -1,3 +1,13 @@
 local.md
 *workspace
 evals/
+
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+
+# TMA drilldown runtime
+skills/tma-drilldown/sessions/
+skills/tma-drilldown/.venv/
