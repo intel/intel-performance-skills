@@ -1,0 +1,103 @@
+=================================================
+            Trace Event Information
+=================================================
+  Total records                     :    4182733
+  Locked Load/Store Operations      :      61904
+  Load Operations                   :    1873310
+  Loads - uncacheable               :          0
+  Loads - IO                        :          0
+  Loads - Miss                      :       2214
+  Loads - no mapping                :        391
+  Load Fill Buffer Hit              :     598201
+  Load L1D hit                      :     902117
+  Load L2D hit                      :      14870
+  Load LLC hit                      :     303517
+  Load Local HITM                   :      21876
+  Load Remote HITM                  :          0
+  Load Remote HIT                   :          0
+  Load Local DRAM                   :      52000
+  Load Remote DRAM                  :          0
+  Load MESI State Exclusive         :      52000
+  Load MESI State Shared            :          0
+  Load LLC Misses                   :      52000
+  Load access blocked by data       :          0
+  Load access blocked by address    :          0
+  Load HIT Local Peer               :          0
+  Load HIT Remote Peer              :          0
+  LLC Misses to Local DRAM          :     100.0%
+  LLC Misses to Remote DRAM         :       0.0%
+  LLC Misses to Remote cache (HIT)  :       0.0%
+  LLC Misses to Remote cache (HITM) :       0.0%
+  Store Operations                  :    2309423
+  Store - uncacheable               :          0
+  Store - no mapping                :          0
+  Store L1D Hit                     :    2271880
+  Store L1D Miss                    :      37543
+  Store No available memory level   :          0
+  No Page Map Rejects               :      51022
+  Unable to parse data source       :          0
+
+=================================================
+    Global Shared Cache Line Event Information
+=================================================
+  Total Shared Cache Lines          :          9
+  Load HITs on shared lines         :     512730
+  Fill Buffer Hits on shared lines  :     201845
+  L1D hits on shared lines          :     160322
+  L2D hits on shared lines          :        402
+  LLC hits on shared lines          :     150161
+  Load hits on peer cache or nodes  :          0
+  Locked Access on shared lines     :      40112
+  Blocked Access on shared lines    :          0
+  Store HITs on shared lines        :     247019
+  Store L1D hits on shared lines    :     238777
+  Store No available memory level   :          0
+  Total Merged records              :     298355
+
+=================================================
+                 c2c details
+=================================================
+  Events                            : cpu/mem-loads,ldlat=30/P
+                                    : cpu/mem-stores/P
+  Cachelines sort on                : Total HITMs
+  Cacheline data grouping           : offset,iaddr
+
+=================================================
+           Shared Data Cache Line Table
+=================================================
+#
+#        ----------- Cacheline ----------      Tot  ------- Load Hitm -------    Total    Total    Total  --------- Stores --------  ----- Core Load Hit -----  - LLC Load Hit --  - RMT Load Hit --  --- Load Dram ----
+# Index             Address  Node  PA cnt     Hitm    Total  LclHitm  RmtHitm  records    Loads   Stores    L1Hit   L1Miss      N/A       FB       L1       L2    LclHit  LclHitm    RmtHit  RmtHitm       Lcl       Rmt
+# .....  ..................  ....  ......  .......  .......  .......  .......  .......  .......  .......  .......  .......  .......  .......  .......  .......  ........  .......  ........  .......  ........  ........
+#
+      0      0x55e4b9c2f080     0       1   84.37%    18457    18457        0    72310    24120    48190    47322      868        0     7477     5306       40         0    18457         0        0         0         0
+      1      0x55e4b9c2f200     0       1    6.88%     1505     1505        0     4210     2304     1906     1611      295        0      714      506       40         0     1505         0        0         0         0
+      2      0x7f9a10000a00     0       2    1.95%      427      427        0     1873     1102      771      760       11        0      341      242       40        52      427         0        0         0         0
+
+=================================================
+      Shared Cache Line Distribution Pareto
+=================================================
+#
+#        ----- HITM -----  ------- Store Refs ------  --------- Data address ---------                      ---------- cycles ----------    Total       cpu                                  Shared
+#   Num  RmtHitm  LclHitm   L1 Hit  L1 Miss      N/A              Offset  Node  PA cnt        Code address  rmt hitm  lcl hitm      load  records       cnt                         Symbol             Object                  Source:Line  Node
+# .....  .......  .......  .......  .......  .......  ..................  ....  ......  ..................  ........  ........  ........  .......  ........  .............................  .................  ...........................  ....
+#
+  -----------------------------------------------------------------------------------------------
+      0        0    18457    47322      868        0      0x55e4b9c2f080
+  -----------------------------------------------------------------------------------------------
+           0.00%   26.12%   25.31%   24.88%    0.00%                 0x0     0       1            0x401b1a         0       344       202    18210         1  [.] worker_update_stats+0xa    solver             worker.c:34                     0
+           0.00%   25.40%   24.97%   25.46%    0.00%                0x10     0       1            0x401b1a         0       351       199    18077         1  [.] worker_update_stats+0xa    solver             worker.c:34                     0
+           0.00%   24.59%   24.86%   24.77%    0.00%                0x20     0       1            0x401b1a         0       339       205    17996         1  [.] worker_update_stats+0xa    solver             worker.c:34                     0
+           0.00%   23.89%   24.86%   24.89%    0.00%                0x30     0       1            0x401b1a         0       347       201    18027         1  [.] worker_update_stats+0xa    solver             worker.c:34                     0
+
+  -----------------------------------------------------------------------------------------------
+      1        0     1505     1611      295        0      0x55e4b9c2f200
+  -----------------------------------------------------------------------------------------------
+           0.00%  100.00%  100.00%  100.00%    0.00%                 0x0     0       1            0x4019c4         0       402       236     4210         4  [.] next_block+0x14            solver             queue.c:41                      0
+
+  -----------------------------------------------------------------------------------------------
+      2        0      427      760       11        0      0x7f9a10000a00
+  -----------------------------------------------------------------------------------------------
+           0.00%   71.30%   64.20%   63.64%    0.00%                 0x8     0       1            0x402233         0       288       177     1210         4  [.] merge_results+0x33         solver             merge.c:58                      0
+           0.00%   28.70%   35.80%   36.36%    0.00%                 0x8     0       1            0x40227e         0       279       181      663         4  [.] merge_results+0x7e         solver             merge.c:63                      0
+

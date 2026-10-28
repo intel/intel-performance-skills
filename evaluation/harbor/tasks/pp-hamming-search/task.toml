@@ -1,0 +1,27 @@
+schema_version = "1.3"
+
+[metadata]
+skill = "performance-patterns"
+author_name = "Nikolay Petrov"
+author_email = "nikolay.a.petrov@intel.com"
+difficulty = "hard"
+difficulty_explanation = "Fixing the libgcc popcount call is easy; the bar is the throughput of a 512-bit vector popcount path with runtime dispatch, which a 64-bit popcnt loop (1-1.4x), a nibble-LUT in ymm/zmm (~1.8-2.1x) or compiler auto-vectorization via target_clones (~2.2x) does not reach."
+category = "performance"
+tags = ["c", "hamming", "popcount", "simd", "avx512", "cpu-dispatch"]
+
+[verifier]
+timeout_sec = 300.0
+network_mode = "no-network"
+
+[agent]
+timeout_sec = 1800.0
+# The agent reaches its model API through the network; the task itself needs none.
+network_mode = "public"
+
+[environment]
+build_timeout_sec = 600.0
+network_mode = "public"
+cpus = 4
+memory_mb = 4096
+storage_mb = 4096
+gpus = 0

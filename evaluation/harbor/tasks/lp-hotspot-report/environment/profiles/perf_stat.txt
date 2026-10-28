@@ -1,0 +1,20 @@
+
+ Performance counter stats for './solver --input case1 --threads 4':
+
+         10,020.13 msec task-clock                       #    3.912 CPUs utilized
+            20,004      context-switches                 #    1.996 K/sec
+               311      cpu-migrations                   #   31.038 /sec
+             4,812      page-faults                      #  480.233 /sec
+    31,250,418,207      cycles                           #    3.119 GHz
+    19,100,731,554      instructions                     #    0.61  insn per cycle
+     3,211,046,180      branches                         #  320.461 M/sec
+        41,422,496      branch-misses                    #    1.29% of all branches
+       211,302,875      cache-references                 #   21.088 M/sec
+         2,260,940      cache-misses                     #    1.07% of all cache refs
+
+       2.561478213 seconds time elapsed
+
+       8.402116000 seconds user
+       1.618004000 seconds sys
+
+

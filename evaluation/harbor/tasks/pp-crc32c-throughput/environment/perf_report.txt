@@ -1,0 +1,16 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+# Samples: 412K of event 'cycles:P'
+# Event count (approx.): 389214556120
+#
+# Overhead  Command   Shared Object       Symbol
+# ........  ........  ..................  .....................................
+#
+    61.42%  blockd    libcrc32c.a         [.] crc32c
+     9.87%  blockd    [kernel.kallsyms]   [k] copy_user_enhanced_fast_string
+     6.11%  blockd    blockd              [.] block_write_submit
+     4.30%  blockd    libc.so.6           [.] __memmove_avx512_unaligned_erms
+     3.05%  blockd    [kernel.kallsyms]   [k] nvme_queue_rq
+     2.48%  blockd    blockd              [.] extent_map_lookup
+     1.92%  blockd    libc.so.6           [.] _int_malloc
+     1.20%  blockd    [kernel.kallsyms]   [k] __x64_sys_io_uring_enter

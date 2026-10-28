@@ -1,0 +1,10 @@
+Captured on a production host (32 cores, 1 socket, SMT off), kvgate built -O2 -g,
+running with 24 workers + 1 listener/parser thread + 1 flusher thread under the
+standard replay load:
+
+  perf c2c record -g -- sleep 20        (system-wide while kvgate was serving)
+  perf c2c report --full-symbols --stdio --double-cl > c2c_report.txt
+
+Addresses in the report are 128-byte (double cache line) groups; the Offset column
+in the Pareto section is the byte offset inside that group. The perf.data file was
+not kept, and perf is not installed in this environment.

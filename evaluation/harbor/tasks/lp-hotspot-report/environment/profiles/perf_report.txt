@@ -1,0 +1,34 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 40K of event 'cycles:P'
+# Event count (approx.): 31187220541
+#
+# Overhead  Command  Shared Object      Symbol
+# ........  .......  .................  ..................................
+#
+    58.42%  solver   solver             [.] accumulate_scores
+    18.77%  solver   solver             [.] worker_update_stats
+     7.11%  solver   libc.so.6          [.] __memmove_avx_unaligned_erms
+     4.61%  solver   solver             [.] parse_record
+     2.10%  solver   [kernel.kallsyms]  [k] futex_wait_queue
+     1.88%  solver   solver             [.] read_block
+     1.37%  solver   [kernel.kallsyms]  [k] clear_page_erms
+     1.12%  solver   libc.so.6          [.] _int_malloc
+     0.96%  solver   [kernel.kallsyms]  [k] copy_user_enhanced_fast_string
+     0.74%  solver   solver             [.] normalize_row
+     0.61%  solver   libc.so.6          [.] _int_free
+     0.53%  solver   [kernel.kallsyms]  [k] native_queued_spin_lock_slowpath
+     0.41%  solver   solver             [.] merge_results
+     0.33%  solver   libc.so.6          [.] __strtod_internal
+     0.29%  solver   [kernel.kallsyms]  [k] syscall_exit_to_user_mode
+     0.21%  solver   solver             [.] main
+     0.12%  solver   ld-linux-x86-64.so.2  [.] _dl_relocate_object
+     0.02%  solver   [kernel.kallsyms]  [k] __handle_mm_fault
+
+
+#
+# (Tip: To show assembler sample contexts use perf record -b / perf script -F +brstackinsn --xed)
+#

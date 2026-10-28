@@ -1,0 +1,26 @@
+Sorted summary for file /build/solver/solver
+----------------------------------------------
+
+   91.04 worker.c:34
+    8.13 worker.c:35
+    0.83 worker.c:36
+ Percent |	Source code & Disassembly of solver for cycles:P (7510 samples, percent: local period)
+-----------------------------------------------------------------------------------------------
+         :
+         :
+         :
+         :            Disassembly of section .text:
+         :
+         :            0000000000401b10 <worker_update_stats>:
+         :            worker_update_stats():
+         :            void worker_update_stats(struct worker_stats *stats, int id, uint64_t now)
+         :            {
+         :            stats[id].processed++;
+ worker.c:34    1.12 :   401b10:   movslq %esi,%rsi
+ worker.c:34    0.87 :   401b13:   shl    $0x4,%rsi
+ worker.c:34    0.64 :   401b17:   add    %rsi,%rdi
+ worker.c:34   88.41 :   401b1a:   addq   $0x1,(%rdi)
+         :            stats[id].last_batch_ns = now;
+ worker.c:35    8.13 :   401b1e:   mov    %rdx,0x8(%rdi)
+         :            }
+ worker.c:36    0.83 :   401b22:   ret

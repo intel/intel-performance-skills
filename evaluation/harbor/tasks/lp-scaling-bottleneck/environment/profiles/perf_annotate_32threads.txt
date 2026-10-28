@@ -1,0 +1,48 @@
+ Percent |	Source code & Disassembly of ingestd for cycles:P (991404 samples, percent: local period)
+---------------------------------------------------------------------------------------------------------
+         :
+         :
+         :
+         :            Disassembly of section .text:
+         :
+         :            0000000000412a40 <ring_lock_acquire>:
+         :            ring_lock_acquire():
+         :            void ring_lock_acquire(struct ring *r)
+         :            {
+         :            while (!__sync_bool_compare_and_swap(&r->lock, 0, 1))
+    2.87 :   412a40:   xor    %eax,%eax
+    0.95 :   412a42:   mov    $0x1,%edx
+   94.36 :   412a47:   lock cmpxchg %edx,(%rdi)
+    0.91 :   412a4b:   jne    412a40 <ring_lock_acquire>
+         :            ;
+         :            }
+    0.91 :   412a4d:   ret
+
+
+ Percent |	Source code & Disassembly of ingestd for cycles:P (324064 samples, percent: local period)
+---------------------------------------------------------------------------------------------------------
+         :
+         :
+         :
+         :            Disassembly of section .text:
+         :
+         :            00000000004139c0 <batch_commit>:
+         :            batch_commit():
+         :            void batch_commit(struct out_batch *b)
+         :            {
+    0.31 :   4139c0:   push   %rbx
+    0.12 :   4139c1:   mov    %rdi,%rbx
+         :            emit_batch(b->sink, b->recs, b->count);
+    0.18 :   4139c4:   mov    0x10(%rdi),%edx
+    0.09 :   4139c7:   mov    0x8(%rdi),%rsi
+    0.14 :   4139cb:   mov    (%rdi),%rdi
+    0.47 :   4139ce:   call   413a20 <emit_batch>
+         :            atomic_fetch_add_explicit(&g_records_committed, b->count,
+         :            memory_order_relaxed);
+    1.06 :   4139d3:   mov    0x10(%rbx),%eax
+   86.20 :   4139d6:   lock add %rax,0x2b1f62(%rip)        # 6c5940 <g_records_committed>
+         :            b->count = 0;
+    9.98 :   4139de:   movl   $0x0,0x10(%rbx)
+         :            }
+    0.92 :   4139e5:   pop    %rbx
+    0.53 :   4139e6:   ret

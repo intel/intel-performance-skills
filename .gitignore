@@ -1,3 +1,5 @@
 local.md
 *workspace
 evals/
+evaluation/harbor/jobs/
+__pycache__/

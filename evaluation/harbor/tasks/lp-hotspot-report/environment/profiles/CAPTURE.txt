@@ -1,0 +1,20 @@
+Captured on a production host, solver built -O2 -g, input case1, 4 worker threads:
+
+  perf_stat.txt
+      perf stat -e task-clock,context-switches,cpu-migrations,page-faults,cycles,instructions,branches,branch-misses,cache-references,cache-misses -- ./solver --input case1 --threads 4
+
+  perf_report.txt
+      perf record -g -o perf.data -- ./solver --input case1 --threads 4
+      perf report -i perf.data --stdio --no-children --sort=comm,dso,sym
+
+  perf_annotate_accumulate_scores.txt, perf_annotate_worker_update_stats.txt,
+  perf_annotate_memmove.txt
+      perf annotate -i perf.data --stdio -l -s <symbol>
+      (libc has no debug info on that host, so the memmove one is assembly only)
+
+  perf_c2c_report.txt
+      perf c2c record -g -- ./solver --input case1 --threads 4
+      perf c2c report --full-symbols --stdio --double-cl
+
+Sources for the solver functions are in /app/src/. The perf.data files were not
+kept, and perf is not installed in this environment.

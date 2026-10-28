@@ -1,0 +1,38 @@
+Sorted summary for file /build/solver/solver
+----------------------------------------------
+
+   75.84 score.c:16
+   24.10 score.c:15
+    0.05 score.c:19
+    0.01 score.c:14
+ Percent |	Source code & Disassembly of solver for cycles:P (23375 samples, percent: local period)
+-----------------------------------------------------------------------------------------------
+         :
+         :
+         :
+         :            Disassembly of section .text:
+         :
+         :            0000000000401a30 <accumulate_scores>:
+         :            accumulate_scores():
+         :            double accumulate_scores(const double *a, const double *b, size_t n)
+         :            {
+         :            double sum = 0.0;
+         :            for (size_t i = 0; i < n; ++i)
+ score.c:15    0.02 :   401a30:   test   %rdx,%rdx
+ score.c:15    0.00 :   401a33:   je     401a58 <accumulate_scores+0x28>
+         :            double sum = 0.0;
+ score.c:14    0.01 :   401a35:   pxor   %xmm0,%xmm0
+         :            for (size_t i = 0; i < n; ++i)
+ score.c:15    0.00 :   401a39:   xor    %eax,%eax
+ score.c:15    0.00 :   401a3b:   nopl   0x0(%rax,%rax,1)
+         :            sum += a[i] * b[i];
+ score.c:16    5.93 :   401a40:   movsd  (%rdi,%rax,8),%xmm1
+ score.c:16   10.12 :   401a45:   mulsd  (%rsi,%rax,8),%xmm1
+ score.c:16   59.79 :   401a4a:   addsd  %xmm1,%xmm0
+         :            for (size_t i = 0; i < n; ++i)
+ score.c:15   10.98 :   401a4e:   add    $0x1,%rax
+ score.c:15    6.41 :   401a52:   cmp    %rax,%rdx
+ score.c:15    6.69 :   401a55:   jne    401a40 <accumulate_scores+0x10>
+         :            return sum;
+         :            }
+ score.c:19    0.05 :   401a57:   ret

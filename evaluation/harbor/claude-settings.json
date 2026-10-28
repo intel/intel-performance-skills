@@ -1,0 +1,4 @@
+{
+  "skillListingBudgetFraction": 0.03,
+  "enabledPlugins": {"cc-plugin-agents-md@builtin": false, "cc-plugin-plugin-authoring@builtin": false}
+}

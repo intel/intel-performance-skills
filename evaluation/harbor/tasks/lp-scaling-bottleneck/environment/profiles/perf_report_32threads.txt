@@ -1,0 +1,31 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 3624K of event 'cycles:P'
+# Event count (approx.): 2894517330121
+#
+# Overhead       Samples  Command          Shared Object                Symbol
+# ........  ............  ...............  ...........................  ......................................
+#
+   40.12%       1454300  ingest-wrk       ingestd                      [.] score_block
+   27.35%        991404  ingest-wrk       ingestd                      [.] ring_lock_acquire
+    8.94%        324064  ingest-wrk       ingestd                      [.] batch_commit
+    5.51%        199731  ingest-wrk       ingestd                      [.] parse_record
+    2.84%        102946  ingest-wrk       libc.so.6                    [.] __memmove_avx_unaligned_erms
+    1.88%         68148  ingest-wrk       ingestd                      [.] hash_lookup
+    1.42%         51473  ingest-wrk       [kernel.kallsyms]            [k] native_queued_spin_lock_slowpath
+    1.23%         44586  ingest-wrk       ingestd                      [.] decode_varint
+    0.97%         35161  ingest-wrk       ingestd                      [.] ring_pop
+    0.66%         23924  ingest-wrk       libc.so.6                    [.] _int_malloc
+    0.41%         14862  ingest-wrk       ingestd                      [.] ring_push
+    0.36%         13050  ingest-wrk       libc.so.6                    [.] _int_free
+    0.24%          8700  ingest-wrk       ingestd                      [.] emit_batch
+    0.21%          7612  ingest-wrk       [kernel.kallsyms]            [k] clear_page_erms
+    0.11%          3987  ingest-wrk       ingestd                      [.] checksum_block
+
+
+#
+# (Tip: use 'perf report --sort=dso,sym' to group by object)
+#

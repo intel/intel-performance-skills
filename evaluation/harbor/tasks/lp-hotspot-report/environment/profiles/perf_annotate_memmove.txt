@@ -1,0 +1,26 @@
+ Percent |	Source code & Disassembly of libc.so.6 for cycles:P (2845 samples, percent: local period)
+-----------------------------------------------------------------------------------------------
+         :
+         :
+         :
+         :            Disassembly of section .text:
+         :
+         :            00000000000a8d40 <__memmove_avx_unaligned_erms>:
+    0.42 :   a8d40:   mov    %rdi,%rax
+    0.35 :   a8d43:   cmp    $0x20,%rdx
+    0.00 :   a8d47:   jb     a8d80 <__memmove_avx_unaligned_erms+0x40>
+    0.21 :   a8d49:   cmp    $0x40,%rdx
+    0.00 :   a8d4d:   ja     a8e10 <__memmove_avx_unaligned_erms+0xd0>
+         :            ...
+    0.88 :   a8e10:   cmp    __x86_rep_movsb_threshold(%rip),%rdx
+    0.00 :   a8e17:   jae    a8f20 <__memmove_avx_unaligned_erms+0x1e0>
+         :            ...
+    1.97 :   a8f20:   mov    %rdx,%rcx
+   84.71 :   a8f23:   rep movsb %ds:(%rsi),%es:(%rdi)
+    0.54 :   a8f25:   vzeroupper
+    0.00 :   a8f28:   ret
+         :            ...
+    3.96 :   a8e40:   vmovdqu (%rsi),%ymm0
+    2.12 :   a8e44:   vmovdqu -0x20(%rsi,%rdx,1),%ymm1
+    2.77 :   a8e4a:   vmovdqu %ymm0,(%rdi)
+    2.07 :   a8e4e:   vmovdqu %ymm1,-0x20(%rdi,%rdx,1)

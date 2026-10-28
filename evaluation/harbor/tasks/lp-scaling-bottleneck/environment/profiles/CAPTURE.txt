@@ -1,0 +1,20 @@
+How these files were captured (production host, same binary for every file,
+built with -O2 -g):
+
+  scaling_sweep.txt
+      ingestd --replay <capture> --threads N      for N in 1 2 4 8 16 32
+
+  perf_report_1thread.txt
+      perf record -F 999 -g -o perf_1thread.data -- ingestd --replay <capture> --threads 1
+      perf report -i perf_1thread.data --stdio --no-children -n --sort=comm,dso,sym | head -15 rows
+
+  perf_report_32threads.txt
+      perf record -F 999 -g -o perf_32threads.data -- ingestd --replay <capture> --threads 32
+      perf report -i perf_32threads.data --stdio --no-children -n --sort=comm,dso,sym | head -15 rows
+
+  perf_annotate_32threads.txt
+      perf annotate -i perf_32threads.data --stdio -s ring_lock_acquire
+      perf annotate -i perf_32threads.data --stdio -s batch_commit
+
+All worker threads are named ingest-wrk. The perf.data files themselves were not
+kept; perf is not installed in this environment.

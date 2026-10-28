@@ -1,0 +1,27 @@
+schema_version = "1.3"
+
+[metadata]
+skill = "performance-patterns"
+author_name = "Nikolay Petrov"
+author_email = "nikolay.a.petrov@intel.com"
+difficulty = "medium"
+difficulty_explanation = "Ten seeded performance problems across a C kernel file and a C++ thread pool, plus four look-alikes that are already correct. The concurrency problems are textbook; passing also needs at least two of the less visible ones (missing restrict, missing vzeroupper after inline AVX asm, std::sort on large float arrays, a byte-table CRC32C, a per-byte Hamming loop) without flagging more than one decoy."
+category = "performance"
+tags = ["c", "cpp", "code-review", "concurrency", "simd"]
+
+[verifier]
+timeout_sec = 120.0
+network_mode = "no-network"
+
+[agent]
+timeout_sec = 1800.0
+# The agent reaches its model API through the network; the task itself needs none.
+network_mode = "public"
+
+[environment]
+build_timeout_sec = 600.0
+network_mode = "public"
+cpus = 4
+memory_mb = 4096
+storage_mb = 4096
+gpus = 0

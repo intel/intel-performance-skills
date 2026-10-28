@@ -1,0 +1,27 @@
+schema_version = "1.3"
+
+[metadata]
+skill = "linux-perf"
+author_name = "Nikolay Petrov"
+author_email = "nikolay.a.petrov@intel.com"
+difficulty = "medium"
+difficulty_explanation = "Recorded 1-thread and 32-thread profiles of a service that plateaus at 8 threads. The hottest function at both thread counts is a compute kernel whose share falls; the scaling bottlenecks are the two functions whose share rises (a CAS spinlock and a shared atomic counter). Naming the hottest function or missing the smaller riser fails; whether the next measurement is perf c2c is recorded, not rewarded."
+category = "performance"
+tags = ["linux-perf", "scaling", "dual-profile", "spinlock", "atomic-counter", "artifact-analysis"]
+
+[verifier]
+timeout_sec = 120.0
+network_mode = "no-network"
+
+[agent]
+timeout_sec = 900.0
+# The agent reaches its model API through the network; the task itself needs none.
+network_mode = "public"
+
+[environment]
+build_timeout_sec = 600.0
+network_mode = "public"
+cpus = 1
+memory_mb = 2048
+storage_mb = 2048
+gpus = 0

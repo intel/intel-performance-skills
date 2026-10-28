@@ -1,0 +1,12 @@
+# ingestd replay benchmark
+# input: fixed replay capture, 12,000,000 records, same file for every run
+# host: 32 cores, 1 socket, SMT off, turbo off; ingestd --threads N, nothing else running
+# each row: median of 3 runs
+#
+# threads   records/s    wall_s
+        1     182,410     65.79
+        2     358,960     33.43
+        4     694,120     17.29
+        8   1,121,350     10.70
+       16   1,198,040     10.02
+       32   1,163,770     10.31

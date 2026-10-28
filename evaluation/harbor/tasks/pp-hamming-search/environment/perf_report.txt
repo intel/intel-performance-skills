@@ -1,0 +1,16 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+# Samples: 287K of event 'cycles:P'
+# Event count (approx.): 271503889410
+#
+# Overhead  Command   Shared Object       Symbol
+# ........  ........  ..................  .....................................
+#
+    44.86%  rerankd   librerank.so        [.] hamming_distance
+    23.17%  rerankd   librerank.so        [.] __popcountdi2
+     6.02%  rerankd   librerank.so        [.] hamming_nearest
+     5.74%  rerankd   rerankd             [.] shortlist_fetch
+     4.11%  rerankd   libc.so.6           [.] __memmove_avx512_unaligned_erms
+     2.96%  rerankd   [kernel.kallsyms]   [k] copy_user_enhanced_fast_string
+     2.40%  rerankd   rerankd             [.] topk_heap_push
+     1.38%  rerankd   libc.so.6           [.] _int_malloc
