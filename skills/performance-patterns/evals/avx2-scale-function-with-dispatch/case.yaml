@@ -1,0 +1,7 @@
+schema_version: "1.1"
+name: avx2-scale-function-with-dispatch
+expected_outcome: |
+  scale.c builds with plain `cc -O2 -fPIC`, selects an AVX2 path at runtime (not only via
+  `#ifdef __AVX2__`) with a working fallback, handles lengths that are not a multiple of 8 and
+  unaligned pointers, and gives exact results with and without AVX2. Any `restrict` use is
+  deliberate and documented, since in-place scaling is a common way to call this function.

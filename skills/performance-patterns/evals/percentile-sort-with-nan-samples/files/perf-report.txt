@@ -1,0 +1,44 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 1M of event 'cycles:P'
+# Event count (approx.): 1061728911874
+#
+# Children      Self  Command      Shared Object         Symbol
+# ........  ........  ...........  ....................  ...............................................................................................................
+#
+    99.12%     0.00%  latency-rpt  latency-rpt           [.] main
+            |
+            ---main
+               |
+               |--97.61%--run_report
+               |          |
+               |          |--93.85%--compute_percentiles
+               |          |          |
+               |          |          |--70.43%--std::sort<__gnu_cxx::__normal_iterator<float*, std::vector<float, std::allocator<float> > > > (inlined)
+               |          |          |          std::__sort<__gnu_cxx::__normal_iterator<float*, std::vector<float, std::allocator<float> > >, __gnu_cxx::__ops::_Iter_less_iter> (inlined)
+               |          |          |          |
+               |          |          |          |--62.08%--std::__introsort_loop<__gnu_cxx::__normal_iterator<float*, std::vector<float, std::allocator<float> > >, long, __gnu_cxx::__ops::_Iter_less_iter>
+               |          |          |          |
+               |          |          |           --8.35%--std::__final_insertion_sort<__gnu_cxx::__normal_iterator<float*, std::vector<float, std::allocator<float> > >, __gnu_cxx::__ops::_Iter_less_iter>
+               |          |          |
+               |          |          |--15.60%--__memmove_avx512_unaligned_erms
+               |          |          |
+               |          |           --7.82%--std::count_if<...> (inlined)
+               |          |
+               |           --3.76%--load_samples
+               |
+                --1.51%--write_report
+
+    62.08%    62.08%  latency-rpt  latency-rpt           [.] std::__introsort_loop<__gnu_cxx::__normal_iterator<float*, std::vector<float, std::allocator<float> > >, long, __gnu_cxx::__ops::_Iter_less_iter>
+    15.60%    15.60%  latency-rpt  libc.so.6             [.] __memmove_avx512_unaligned_erms
+     8.35%     8.35%  latency-rpt  latency-rpt           [.] std::__final_insertion_sort<__gnu_cxx::__normal_iterator<float*, std::vector<float, std::allocator<float> > >, __gnu_cxx::__ops::_Iter_less_iter>
+     7.82%     7.82%  latency-rpt  latency-rpt           [.] compute_percentiles
+     3.76%     3.76%  latency-rpt  latency-rpt           [.] load_samples
+     0.88%     0.88%  latency-rpt  [kernel.kallsyms]     [k] clear_page_erms
+     0.41%     0.41%  latency-rpt  libc.so.6             [.] _int_malloc
+#
+# (Tip: For a higher level overview, try: perf report --sort comm,dso)
+#

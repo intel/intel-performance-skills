@@ -1,0 +1,41 @@
+$ perf annotate --stdio -l -s sse
+ Percent |	Source code & Disassembly of fitbench for cycles:P (83617 samples, percent: local period)
+---------------------------------------------------------------------------------------------------------
+         :
+         :
+         :
+         :            Disassembly of section .text:
+         :
+         :            0000000000001a70 <sse>:
+         :            sse():
+         :            #include <stddef.h>
+         :
+         :            double sse(const double *obs, const double *pred, size_t n)
+         :            {
+         :            double s = 0.0;
+         :            for (size_t i = 0; i < n; i++) {
+    0.00 :   1a70:   test   %rdx,%rdx
+    0.00 :   1a73:   je     1aa0 <sse+0x30>
+    0.00 :   1a75:   xor    %eax,%eax
+         :            double s = 0.0;
+    0.00 :   1a77:   vxorpd %xmm0,%xmm0,%xmm0
+    0.00 :   1a7b:   nopl   0x0(%rax,%rax,1)
+         :            double r = obs[i] - pred[i];
+    2.71 :   1a80:   vmovsd (%rdi,%rax,8),%xmm1
+    1.93 :   1a85:   vsubsd (%rsi,%rax,8),%xmm1,%xmm1
+         :            for (size_t i = 0; i < n; i++) {
+    1.04 :   1a8a:   inc    %rax
+         :            s += r * r;
+   90.12 :   1a8d:   vfmadd231sd %xmm1,%xmm1,%xmm0
+         :            for (size_t i = 0; i < n; i++) {
+    4.20 :   1a92:   cmp    %rax,%rdx
+    0.00 :   1a95:   jne    1a80 <sse+0x10>
+         :            }
+         :            return s;
+         :            }
+    0.00 :   1a97:   ret
+    0.00 :   1a98:   nopl   0x0(%rax,%rax,1)
+         :            double s = 0.0;
+    0.00 :   1aa0:   vxorpd %xmm0,%xmm0,%xmm0
+         :            return s;
+    0.00 :   1aa4:   ret

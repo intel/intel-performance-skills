@@ -1,0 +1,9 @@
+schema_version: "1.1"
+name: rebuild-test-with-debug-info
+expected_outcome: |
+  The installed fluxsim-bin is rebuilt with -g while keeping install.sh's -O2, without
+  destroying the `fluxsim` entry-point script (the source archive's top-level directory has the
+  same name, so extracting it in place replaces the script), and batch-run still works. The
+  response says how it was rebuilt and where the source is.
+context:
+  scaffold_script: place-files.sh

@@ -1,0 +1,10 @@
+schema_version: "1.1"
+name: dot-product-review-mixed-fleet
+expected_outcome: |
+  Explains that the single accumulator creates a loop-carried dependency (latency-bound, not
+  bandwidth-bound) and that reordering the FP additions can change rounding. dot_fast.c builds
+  with plain `cc -O2 -fPIC`, picks an AVX2/AVX-512 path at runtime with a fallback for pre-AVX
+  CPUs, uses several independent vector accumulators, handles the tail, and returns correct
+  results on CPUs with and without AVX2.
+context:
+  scaffold_script: place-files.sh

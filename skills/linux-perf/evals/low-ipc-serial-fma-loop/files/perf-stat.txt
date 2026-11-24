@@ -1,0 +1,33 @@
+$ perf stat -e task-clock,context-switches,cpu-migrations,page-faults,cycles,instructions,branches,branch-misses,cache-references,cache-misses -- ./fitbench --points 100000 --iters 200000
+
+ Performance counter stats for './fitbench --points 100000 --iters 200000':
+
+         21,734.52 msec task-clock                       #    0.999 CPUs utilized
+                63      context-switches                 #    2.899 /sec
+                 0      cpu-migrations                   #    0.000 /sec
+               537      page-faults                      #   24.707 /sec
+    81,397,846,213      cycles                           #    3.745 GHz
+   100,812,330,471      instructions                     #    1.24  insn per cycle
+    20,203,449,815      branches                         #  929.555 M/sec
+         1,207,334      branch-misses                    #    0.01% of all branches
+        52,381,220      cache-references                 #    2.410 M/sec
+           611,906      cache-misses                     #    1.17% of all cache refs
+
+      21.756218904 seconds time elapsed
+
+      21.711130000 seconds user
+       0.012001000 seconds sys
+
+
+$ perf report --stdio --no-children --sort symbol | head -20
+# Samples: 86K of event 'cycles:P'
+# Event count (approx.): 81402219988
+#
+# Overhead  Symbol
+# ........  .................................
+#
+    96.38%  [.] sse
+     1.91%  [.] generate_points
+     1.02%  [.] update_model
+     0.31%  [k] clear_page_erms
+     0.12%  [.] main

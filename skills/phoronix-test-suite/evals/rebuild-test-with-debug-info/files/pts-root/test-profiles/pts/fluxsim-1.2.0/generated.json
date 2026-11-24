@@ -1,0 +1,14 @@
+{
+    "title": "FluxSim",
+    "test_profile_version": "1.2.0",
+    "app_version": "1.2",
+    "overview": "FluxSim is a finite-volume diffusion kernel benchmark. Each iteration diffuses a 2-D field one time step and computes per-column fluxes and the squared residual between steps.",
+    "test_type": "Processor",
+    "unit": "MCells/s",
+    "hib": 1,
+    "run_time_avg": 3,
+    "honors_cflags": "1",
+    "scales_cpu_cores": "0",
+    "supported_platforms": ["Linux", "MacOSX", "BSD"],
+    "public_result_count": 214
+}

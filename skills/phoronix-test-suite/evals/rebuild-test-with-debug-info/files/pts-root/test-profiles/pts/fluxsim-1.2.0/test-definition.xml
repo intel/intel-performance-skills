@@ -1,0 +1,36 @@
+<?xml version="1.0"?>
+<!--Phoronix Test Suite v10.8.4-->
+<PhoronixTestSuite>
+  <TestInformation>
+    <Title>FluxSim</Title>
+    <AppVersion>1.2</AppVersion>
+    <Description>FluxSim is a finite-volume diffusion kernel benchmark. Each iteration diffuses a 2-D field one time step and computes per-column fluxes and the squared residual between steps. The result is grid cells processed per second.</Description>
+    <ResultScale>MCells/s</ResultScale>
+    <Proportion>HIB</Proportion>
+    <TimesToRun>3</TimesToRun>
+  </TestInformation>
+  <TestProfile>
+    <Version>1.2.0</Version>
+    <SupportedPlatforms>Linux, MacOSX, BSD</SupportedPlatforms>
+    <SoftwareType>Benchmark</SoftwareType>
+    <TestType>Processor</TestType>
+    <License>Free</License>
+    <Status>Verified</Status>
+    <ExternalDependencies>build-utilities</ExternalDependencies>
+    <EnvironmentSize>0.1</EnvironmentSize>
+    <ProjectURL>https://example.org/fluxsim/</ProjectURL>
+  </TestProfile>
+  <TestSettings>
+    <Option>
+      <DisplayName>Grid Size</DisplayName>
+      <Identifier>grid</Identifier>
+      <ArgumentPrefix>--grid </ArgumentPrefix>
+      <Menu>
+        <Entry>
+          <Name>1024 x 1024</Name>
+          <Value>1024</Value>
+        </Entry>
+      </Menu>
+    </Option>
+  </TestSettings>
+</PhoronixTestSuite>

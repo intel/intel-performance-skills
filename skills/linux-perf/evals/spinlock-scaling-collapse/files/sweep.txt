@@ -1,0 +1,11 @@
+$ for t in 1 2 4 8 16 32 64; do ./kvbench --threads $t --duration 20 | tail -1; done
+threads=1   ops/s=4.91M   p99=0.61us
+threads=2   ops/s=8.73M   p99=0.83us
+threads=4   ops/s=12.05M  p99=1.92us
+threads=8   ops/s=13.10M  p99=4.40us
+threads=16  ops/s=13.02M  p99=9.75us
+threads=32  ops/s=12.44M  p99=22.1us
+threads=64  ops/s=7.86M   p99=71.3us
+
+Machine: 2x Intel Xeon Gold 6448Y (Sapphire Rapids), 64 cores / 128 threads, threads pinned to physical cores on socket 0 first.
+Workload: 97% of lookups hit; misses fetch from an in-memory backing store and call cache_insert().

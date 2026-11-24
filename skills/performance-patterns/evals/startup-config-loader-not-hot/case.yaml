@@ -1,0 +1,8 @@
+schema_version: "1.1"
+name: startup-config-loader-not-hot
+expected_outcome: |
+  Recognises that config_load runs once at startup on a small file (the file header says so),
+  so there is nothing worth optimizing for speed, and does not push SIMD, multiple
+  accumulators, restrict, cold attributes, branch hints or prefetching onto it.
+context:
+  scaffold_script: place-files.sh

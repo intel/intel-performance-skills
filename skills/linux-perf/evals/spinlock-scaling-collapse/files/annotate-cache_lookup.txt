@@ -1,0 +1,87 @@
+$ perf annotate --stdio -l -s cache_lookup     # from the 64-thread recording
+ Percent |	Source code & Disassembly of kvbench for cycles:P (1418230 samples, percent: local period)
+------------------------------------------------------------------------------------------------------------
+         :
+         :            Disassembly of section .text:
+         :
+         :            0000000000002c40 <cache_lookup>:
+         :            cache_lookup():
+         :            int cache_lookup(struct cache *c, uint64_t key, char out[64])
+         :            {
+    0.00 :   2c40:   mov    %rdx,%r8
+    0.00 :   2c43:   mov    $0x1,%ecx
+    0.00 :   2c48:   jmp    2c52 <cache_lookup+0x12>
+    0.00 :   2c4a:   nopw   0x0(%rax,%rax,1)
+         :            _mm_pause():
+   11.87 :   2c50:   pause
+         :            spin_lock():
+         :            while (!__sync_bool_compare_and_swap(l, 0, 1))
+    0.42 :   2c52:   xor    %eax,%eax
+   68.93 :   2c54:   lock cmpxchg %ecx,(%rdi)
+    0.38 :   2c58:   jne    2c50 <cache_lookup+0x10>
+         :            cache_lookup():
+         :            struct entry *e = c->buckets[key & (NBUCKETS - 1)];
+    0.21 :   2c5a:   movzwl %si,%eax
+    1.94 :   2c5d:   mov    0x30(%rdi,%rax,8),%rax
+         :            while (e && e->key != key)
+    0.05 :   2c62:   test   %rax,%rax
+    0.00 :   2c65:   je     2cd8 <cache_lookup+0x98>
+    2.88 :   2c67:   cmp    %rsi,(%rax)
+    0.02 :   2c6a:   jne    2cc8 <cache_lookup+0x88>
+         :            c->hits++;
+    3.71 :   2c6c:   addq   $0x1,0x8(%rdi)
+         :            lru_unlink():
+         :            if (e->lru_prev) e->lru_prev->lru_next = e->lru_next;
+    0.31 :   2c71:   mov    0x10(%rax),%rdx
+    1.12 :   2c75:   mov    0x18(%rax),%rcx
+    0.04 :   2c79:   test   %rdx,%rdx
+    0.00 :   2c7c:   je     2ce8 <cache_lookup+0xa8>
+    0.66 :   2c7e:   mov    %rcx,0x18(%rdx)
+         :            if (e->lru_next) e->lru_next->lru_prev = e->lru_prev;
+    0.02 :   2c82:   test   %rcx,%rcx
+    0.00 :   2c85:   je     2cf0 <cache_lookup+0xb0>
+    0.71 :   2c87:   mov    %rdx,0x10(%rcx)
+         :            lru_push_front():
+         :            e->lru_next = c->lru_head;
+    0.09 :   2c8b:   mov    0x18(%rdi),%rdx
+    0.85 :   2c8f:   movq   $0x0,0x10(%rax)
+    0.03 :   2c97:   mov    %rdx,0x18(%rax)
+         :            if (c->lru_head) c->lru_head->lru_prev = e;
+    0.00 :   2c9b:   test   %rdx,%rdx
+    0.00 :   2c9e:   je     2ca4 <cache_lookup+0x64>
+    0.52 :   2ca0:   mov    %rax,0x10(%rdx)
+         :            c->lru_head = e;
+    2.12 :   2ca4:   mov    %rax,0x18(%rdi)
+         :            if (!c->lru_tail) c->lru_tail = e;
+    0.10 :   2ca8:   cmpq   $0x0,0x20(%rdi)
+    0.00 :   2cad:   je     2d00 <cache_lookup+0xc0>
+         :            cache_lookup():
+         :            memcpy(out, e->value, sizeof e->value);
+    1.40 :   2caf:   vmovdqu64 0x20(%rax),%zmm0
+    0.33 :   2cb6:   vmovdqu64 %zmm0,(%r8)
+    0.01 :   2cbc:   mov    $0x1,%eax
+         :            spin_unlock():
+         :            __sync_lock_release(l);
+    0.41 :   2cc1:   movl   $0x0,(%rdi)
+         :            cache_lookup():
+         :            return found;
+    0.00 :   2cc7:   vzeroupper
+    0.00 :   2cca:   ret
+         :            e = e->hnext;
+    0.18 :   2ccb:   mov    0x8(%rax),%rax
+    0.04 :   2ccf:   test   %rax,%rax
+    0.00 :   2cd2:   jne    2c67 <cache_lookup+0x27>
+         :            c->misses++;
+    0.11 :   2cd8:   addq   $0x1,0x10(%rdi)
+    0.00 :   2cdd:   xor    %eax,%eax
+    0.03 :   2cdf:   movl   $0x0,(%rdi)
+    0.00 :   2ce5:   ret
+         :            else             c->lru_head = e->lru_next;
+    0.01 :   2ce8:   mov    %rcx,0x18(%rdi)
+    0.00 :   2cec:   jmp    2c82 <cache_lookup+0x42>
+         :            else             c->lru_tail = e->lru_prev;
+    0.01 :   2cf0:   mov    %rdx,0x20(%rdi)
+    0.00 :   2cf4:   jmp    2c8b <cache_lookup+0x4b>
+         :            if (!c->lru_tail) c->lru_tail = e;
+    0.00 :   2d00:   mov    %rax,0x20(%rdi)
+    0.00 :   2d04:   jmp    2caf <cache_lookup+0x6f>

@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<!--Phoronix Test Suite v10.8.4-->
+<PhoronixTestSuite>
+  <Downloads>
+    <Package>
+      <URL>https://example.org/fluxsim/releases/fluxsim-1.0.tar.gz</URL>
+      <MD5>7c1f0e2a9d4b3c6f8e1a2b3c4d5e6f70</MD5>
+      <SHA256>3f6c0d1e2b4a59687c8d9e0f1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d</SHA256>
+      <FileName>fluxsim-1.0.tar.gz</FileName>
+      <FileSize>4410</FileSize>
+    </Package>
+  </Downloads>
+</PhoronixTestSuite>

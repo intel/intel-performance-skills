@@ -1,0 +1,10 @@
+schema_version: "1.1"
+name: c2c-false-vs-true-sharing
+expected_outcome: |
+  Separates the false sharing on the per-worker g_wstats array (different offsets, one writer
+  each) from the true sharing on g_state.inflight (same offset, all workers), notices the
+  read-mostly shutting_down flag riding on the hot inflight line, recommends per-line padding
+  for g_wstats, taking inflight off the per-packet path and moving shutting_down, treats the
+  small lines as minor, and suggests re-running c2c to verify.
+context:
+  scaffold_script: place-files.sh

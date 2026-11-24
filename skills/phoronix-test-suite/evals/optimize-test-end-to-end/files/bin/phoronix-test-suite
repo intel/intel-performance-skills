@@ -1,0 +1,341 @@
+#!/usr/bin/env python3
+"""phoronix-test-suite - sandbox build for this machine.
+
+Implements the subset of the Phoronix Test Suite CLI used here, with the same
+on-disk layout as a regular-user install (~/.phoronix-test-suite):
+
+    <data dir>/test-profiles/pts/<test>-<version>/   test-definition.xml, install.sh, ...
+    <data dir>/installed-tests/pts/<test>-<version>/ entry-point script, binaries, pts-install.json
+    <data dir>/download-cache/                        cached source archives
+    <data dir>/test-results/                          saved results
+
+The data directory is ../pts-root next to this script (override with
+PTS_USER_PATH_OVERRIDE).  Commands: version, list-available-tests,
+list-installed-tests, info, install, batch-install, force-install, run,
+batch-run, benchmark, batch-benchmark, batch-setup.
+"""
+import datetime
+import json
+import os
+import re
+import shutil
+import statistics
+import subprocess
+import sys
+import tempfile
+import xml.etree.ElementTree as ET
+
+VERSION = "10.8.4"
+HERE = os.path.dirname(os.path.realpath(__file__))
+ROOT = os.environ.get("PTS_USER_PATH_OVERRIDE") or os.path.join(os.path.dirname(HERE), "pts-root")
+PROFILES = os.path.join(ROOT, "test-profiles", "pts")
+INSTALLED = os.path.join(ROOT, "installed-tests", "pts")
+CACHE = os.path.join(ROOT, "download-cache")
+RESULTS = os.path.join(ROOT, "test-results")
+
+
+def banner():
+    print("\nPhoronix Test Suite v%s\n" % VERSION)
+
+
+def vkey(v):
+    return tuple(int(x) if x.isdigit() else x for x in re.split(r"[.-]", v))
+
+
+def available():
+    out = {}
+    if os.path.isdir(PROFILES):
+        for d in os.listdir(PROFILES):
+            m = re.match(r"^(.*)-(\d+\.\d+\.\d+)$", d)
+            if m:
+                out.setdefault(m.group(1), []).append(m.group(2))
+    for k in out:
+        out[k].sort(key=vkey)
+    return out
+
+
+def resolve(ident):
+    ident = ident.strip()
+    if ident.startswith("pts/"):
+        ident = ident[4:]
+    tests = available()
+    m = re.match(r"^(.*)-(\d+\.\d+\.\d+)$", ident)
+    if m and m.group(1) in tests and m.group(2) in tests[m.group(1)]:
+        return m.group(1), m.group(2)
+    if ident in tests:
+        return ident, tests[ident][-1]
+    print("\n  [PROBLEM] %s is not recognized as a test, suite, or result file.\n" % ident)
+    sys.exit(1)
+
+
+def profile(name, ver):
+    d = os.path.join(PROFILES, "%s-%s" % (name, ver))
+    td = ET.parse(os.path.join(d, "test-definition.xml")).getroot()
+    rd = ET.parse(os.path.join(d, "results-definition.xml")).getroot()
+    info = {
+        "dir": d,
+        "title": td.findtext("TestInformation/Title"),
+        "app_version": td.findtext("TestInformation/AppVersion"),
+        "description": td.findtext("TestInformation/Description"),
+        "scale": td.findtext("TestInformation/ResultScale"),
+        "proportion": td.findtext("TestInformation/Proportion"),
+        "times": int(td.findtext("TestInformation/TimesToRun") or 3),
+        "template": rd.findtext("ResultsParser/OutputTemplate"),
+        "options": [],
+    }
+    for opt in td.findall("TestSettings/Option"):
+        entries = opt.findall("Menu/Entry")
+        info["options"].append((opt.findtext("DisplayName"), opt.findtext("ArgumentPrefix") or "",
+                                entries[0].findtext("Name"), entries[0].findtext("Value")))
+    dl = ET.parse(os.path.join(d, "downloads.xml")).getroot()
+    info["files"] = [p.findtext("FileName") for p in dl.findall("Downloads/Package")]
+    return info
+
+
+def install_dir(name, ver):
+    return os.path.join(INSTALLED, "%s-%s" % (name, ver))
+
+
+def is_installed(name, ver):
+    return os.path.exists(os.path.join(install_dir(name, ver), "pts-install.json"))
+
+
+def compiler_mask(tmp, log):
+    """Wrap the system compilers so the flags used at install time can be
+    recorded in pts-install.json (what upstream PTS calls the compiler mask)."""
+    os.makedirs(tmp, exist_ok=True)
+    for cc in ("cc", "gcc", "clang", "c++", "g++", "clang++"):
+        real = shutil.which(cc)
+        if not real:
+            continue
+        p = os.path.join(tmp, cc)
+        with open(p, "w") as f:
+            f.write('#!/bin/sh\necho "%s $*" >> "%s"\nexec "%s" "$@"\n' % (cc, log, real))
+        os.chmod(p, 0o755)
+
+
+def do_install(ident, force=False):
+    name, ver = resolve(ident)
+    p = profile(name, ver)
+    dest = install_dir(name, ver)
+    banner()
+    if is_installed(name, ver) and not force:
+        print("    pts/%s-%s is already installed.\n" % (name, ver))
+        return 0
+    print("    1 Test To Install")
+    print("        1 File To Use From The Download Cache\n")
+    print("    pts/%s-%s:" % (name, ver))
+    print("        Test Installation 1 of 1")
+    if os.path.isdir(dest):
+        shutil.rmtree(dest)
+    os.makedirs(dest)
+    for fn in p["files"]:
+        src = os.path.join(CACHE, fn)
+        if not os.path.exists(src):
+            print("        [PROBLEM] %s could not be downloaded." % fn)
+            return 1
+        shutil.copy2(src, dest)
+        print("        Using File From Download Cache: %s" % fn)
+    print("        Installing Test @ %s" % datetime.datetime.now().strftime("%H:%M:%S"))
+    tmp = tempfile.mkdtemp(prefix="pts-mask-")
+    log = os.path.join(tmp, "compiler.log")
+    compiler_mask(os.path.join(tmp, "bin"), log)
+    env = dict(os.environ)
+    env.update(HOME=dest, NUM_CPU_CORES=str(os.cpu_count() or 4), NUM_CPU_JOBS=str(os.cpu_count() or 4),
+               PATH=os.path.join(tmp, "bin") + os.pathsep + env.get("PATH", ""))
+    env.setdefault("CFLAGS", "")
+    env.setdefault("CXXFLAGS", "")
+    t0 = datetime.datetime.now()
+    with open(os.path.join(dest, "install.log"), "w") as lf:
+        rc = subprocess.call(["sh", os.path.join(p["dir"], "install.sh")], cwd=dest, env=env,
+                             stdout=lf, stderr=subprocess.STDOUT)
+    status_file = os.path.join(dest, "install-exit-status")
+    if os.path.exists(status_file):
+        try:
+            rc = rc or int(open(status_file).read().strip() or 0)
+        except ValueError:
+            pass
+        os.remove(status_file)
+    flags = ""
+    if os.path.exists(log):
+        seen = []
+        for line in open(log):
+            for tok in line.split()[1:]:
+                if re.match(r"^-(O\S*|g\S*|m\S+|f\S+|march=\S+|mtune=\S+|mcpu=\S+)$", tok) and tok not in seen:
+                    seen.append(tok)
+        flags = " ".join(seen)
+    shutil.rmtree(tmp, ignore_errors=True)
+    if rc != 0:
+        print("\n    The installer exited with a non-zero exit status.")
+        print("        ERROR: see %s\n" % os.path.join(dest, "install.log"))
+        return 1
+    meta = {
+        "test_installation": {
+            "identifier": "pts/%s-%s" % (name, ver),
+            "install_date": t0.strftime("%Y-%m-%d %H:%M:%S"),
+            "install_time_seconds": max(1, int((datetime.datetime.now() - t0).total_seconds())),
+            "compiler_data": {"compiler-type": "C", "compiler": "cc", "compiler-options": flags},
+            "environment": {"CFLAGS": env.get("CFLAGS", ""), "CXXFLAGS": env.get("CXXFLAGS", "")},
+            "times_run": 0,
+            "average_run_time": None,
+        }
+    }
+    with open(os.path.join(dest, "pts-install.json"), "w") as f:
+        json.dump(meta, f, indent=4)
+    print("        Installation Size: %.1f MB\n" % (sum(os.path.getsize(os.path.join(r, x)) for r, _, fs in os.walk(dest) for x in fs) / 1e6))
+    return 0
+
+
+def do_run(ident):
+    name, ver = resolve(ident)
+    p = profile(name, ver)
+    dest = install_dir(name, ver)
+    banner()
+    if not is_installed(name, ver):
+        print("    pts/%s-%s is not installed.\n    To install, run: phoronix-test-suite install pts/%s-%s\n" % (name, ver, name, ver))
+        return 1
+    times = int(os.environ.get("FORCE_TIMES_TO_RUN") or p["times"])
+    args = " ".join(prefix + value for _, prefix, _, value in p["options"])
+    desc = ", ".join("%s: %s" % (dn, en) for dn, _, en, _ in p["options"])
+    print("%s %s:" % (p["title"], p["app_version"]))
+    print("    pts/%s-%s [%s]" % (name, ver, desc))
+    print("    Test 1 of 1")
+    print("    Estimated Trial Run Count:    %d" % times)
+    values = []
+    rx = re.compile(re.escape(p["template"]).replace(re.escape("#_RESULT_#"), r"([-+0-9.eE]+)"))
+    for i in range(times):
+        print("        Started Run %d @ %s" % (i + 1, datetime.datetime.now().strftime("%H:%M:%S")))
+        sys.stdout.flush()
+        fd, logf = tempfile.mkstemp(prefix="pts-log-")
+        os.close(fd)
+        env = dict(os.environ)
+        env.update(HOME=dest, LOG_FILE=logf, NUM_CPU_CORES=str(os.cpu_count() or 4))
+        entry = os.path.join(dest, name)
+        if not os.path.isfile(entry) or not os.access(entry, os.X_OK):
+            print("        The test run did not produce a result.")
+            print("        E: %s: the test's entry-point script is missing or not executable" % entry)
+            return 1
+        try:
+            subprocess.call([entry] + args.split(), cwd=dest, env=env)
+        except OSError as e:
+            print("        The test run did not produce a result.")
+            print("        E: %s" % e)
+            return 1
+        out = open(logf, errors="replace").read()
+        os.remove(logf)
+        es = os.path.join(dest, "test-exit-status")
+        status = 0
+        if os.path.exists(es):
+            try:
+                status = int(open(es).read().strip() or 0)
+            except ValueError:
+                status = 1
+            os.remove(es)
+        m = rx.search(out)
+        if status != 0 or not m:
+            print("        The test run did not produce a result.")
+            print("        E: " + (out.strip().splitlines() or ["(empty log)"])[-1])
+            return 1
+        values.append(float(m.group(1)))
+    print("\n    %s:" % desc)
+    for v in values:
+        print("        %.2f" % v)
+    avg = statistics.mean(values)
+    print("\n    Average: %.2f %s" % (avg, p["scale"]))
+    if len(values) > 1:
+        print("    Deviation: %.2f%%" % (statistics.stdev(values) / avg * 100))
+    meta_p = os.path.join(dest, "pts-install.json")
+    meta = json.load(open(meta_p))
+    ti = meta["test_installation"]
+    ti["times_run"] = ti.get("times_run", 0) + times
+    with open(meta_p, "w") as f:
+        json.dump(meta, f, indent=4)
+    stamp = datetime.datetime.now().strftime("%Y-%m-%d-%H%M%S")
+    rdir = os.path.join(RESULTS, "%s-%s" % (stamp, name))
+    os.makedirs(rdir, exist_ok=True)
+    with open(os.path.join(rdir, "composite.xml"), "w") as f:
+        f.write('<?xml version="1.0"?>\n<PhoronixTestSuite>\n  <Result>\n    <Identifier>pts/%s-%s</Identifier>\n'
+                '    <Title>%s</Title>\n    <Description>%s</Description>\n    <Scale>%s</Scale>\n    <Proportion>%s</Proportion>\n'
+                '    <Data>\n      <Entry>\n        <Value>%.2f</Value>\n        <RawString>%s</RawString>\n      </Entry>\n    </Data>\n'
+                '  </Result>\n</PhoronixTestSuite>\n' % (name, ver, p["title"], desc, p["scale"], p["proportion"], avg,
+                                                        ":".join("%.2f" % v for v in values)))
+    print("\n    Results Saved To: %s\n" % os.path.join(rdir, "composite.xml"))
+    return 0
+
+
+def do_info(ident):
+    name, ver = resolve(ident)
+    p = profile(name, ver)
+    banner()
+    print("%s %s" % (p["title"], p["app_version"]))
+    print("    Run Identifier: pts/%s-%s" % (name, ver))
+    print("    Profile Version: %s" % ver)
+    print("    Maintainer: FluxSim project")
+    print("    Test Type: Processor")
+    print("    Software Type: Benchmark")
+    print("    License Type: Free")
+    print("    Test Status: Verified")
+    print("    Supported Platforms: Linux, MacOSX, BSD")
+    print("    Project Web-Site: https://example.org/fluxsim/")
+    print("    Estimated Run-Time: 9 Seconds")
+    print("    Download Size: %s" % ", ".join(p["files"]))
+    print("\n    Description: %s\n" % p["description"])
+    print("    Test Installed: %s" % ("Yes" if is_installed(name, ver) else "No"))
+    print("    Result Scale: %s (%s)\n" % (p["scale"], "Higher Is Better" if p["proportion"] == "HIB" else "Lower Is Better"))
+    return 0
+
+
+def main(argv):
+    if len(argv) < 2 or argv[1] in ("help", "--help", "-h"):
+        banner()
+        print(__doc__)
+        return 0
+    cmd, rest = argv[1], argv[2:]
+    if cmd in ("version", "--version"):
+        print("Phoronix Test Suite v%s (Lustgarten)" % VERSION)
+        return 0
+    if cmd == "list-available-tests":
+        banner()
+        for name, vers in sorted(available().items()):
+            p = profile(name, vers[-1])
+            print("pts/%-22s %-34s Processor" % (name, p["title"]))
+        for extra in (("compress-zstd", "Zstd Compression", "Processor"), ("c-ray", "C-Ray", "Processor"),
+                      ("mt-dgemm", "ACES DGEMM", "Processor"), ("openssl", "OpenSSL", "Processor")):
+            print("pts/%-22s %-34s %s   [not available in the sandbox mirror]" % extra)
+        print()
+        return 0
+    if cmd == "list-installed-tests":
+        banner()
+        if os.path.isdir(INSTALLED):
+            for d in sorted(os.listdir(INSTALLED)):
+                if os.path.exists(os.path.join(INSTALLED, d, "pts-install.json")):
+                    print("pts/%s" % d)
+        print()
+        return 0
+    if cmd == "batch-setup":
+        banner()
+        print("    Batch mode is already configured (save results: yes, prompts: no).\n")
+        return 0
+    if not rest:
+        print("\n  [PROBLEM] Phoronix Test Suite command '%s' requires an argument.\n" % cmd)
+        return 1
+    if cmd == "info":
+        return do_info(rest[0])
+    if cmd in ("install", "batch-install"):
+        return max(do_install(t) for t in rest)
+    if cmd == "force-install":
+        return max(do_install(t, force=True) for t in rest)
+    if cmd in ("run", "batch-run", "benchmark", "batch-benchmark"):
+        if cmd in ("benchmark", "batch-benchmark"):
+            for t in rest:
+                n, v = resolve(t)
+                if not is_installed(n, v):
+                    do_install(t)
+        return max(do_run(t) for t in rest)
+    print("\n  [PROBLEM] '%s' is not supported by this sandbox build of phoronix-test-suite.\n" % cmd)
+    print(__doc__)
+    return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

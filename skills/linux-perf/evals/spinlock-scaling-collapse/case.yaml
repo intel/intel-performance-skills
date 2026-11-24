@@ -1,0 +1,10 @@
+schema_version: "1.1"
+name: spinlock-scaling-collapse
+expected_outcome: |
+  Finds the test-and-set spinlock in cache_lookup (31% -> 72%, samples on lock cmpxchg/pause),
+  explains the exclusive cache-line bouncing, recommends TTAS or a better lock, notices the lock
+  shares its line with hits/lru_head written in the critical section, and explains that a
+  single global lock with per-hit LRU writes still caps scaling (shard, or avoid per-hit
+  writes) rather than proposing a plain rwlock.
+context:
+  scaffold_script: place-files.sh

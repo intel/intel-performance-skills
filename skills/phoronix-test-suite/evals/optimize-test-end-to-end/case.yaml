@@ -1,0 +1,10 @@
+schema_version: "1.1"
+name: optimize-test-end-to-end
+expected_outcome: |
+  Measures a baseline with the PTS runner, finds the strided column sum and the serial
+  residual reduction, fixes them in the test's source, rebuilds so PTS runs the new binary
+  (without breaking the entry-point script or changing the workload), re-measures with PTS, and
+  reports baseline, new score and percentage change accurately, with where the modified source
+  lives.
+context:
+  scaffold_script: place-files.sh

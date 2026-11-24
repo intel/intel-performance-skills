@@ -1,3 +1,5 @@
 local.md
 *workspace
-evals/
+# results written by `claude plugin eval`
+evals/results/
+__pycache__/
