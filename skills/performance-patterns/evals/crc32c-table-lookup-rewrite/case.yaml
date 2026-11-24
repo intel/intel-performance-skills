@@ -1,0 +1,9 @@
+schema_version: "1.1"
+name: crc32c-table-lookup-rewrite
+expected_outcome: |
+  A drop-in replacement with identical results (including the file's no-inversion seed
+  convention) that uses the SSE4.2 CRC32 instruction with several independent streams and/or
+  PCLMULQDQ folding, adds a VPCLMULQDQ/AVX-512 path for Ice Lake / Sapphire Rapids selected at
+  runtime, keeps a fallback, and builds with plain `cc -O2 -fPIC`.
+context:
+  scaffold_script: place-files.sh

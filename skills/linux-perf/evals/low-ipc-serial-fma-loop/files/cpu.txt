@@ -1,0 +1,32 @@
+$ lscpu | head -20
+Architecture:             x86_64
+  CPU op-mode(s):         32-bit, 64-bit
+  Address sizes:          52 bits physical, 57 bits virtual
+  Byte Order:             Little Endian
+CPU(s):                   112
+  On-line CPU(s) list:    0-111
+Vendor ID:                GenuineIntel
+  Model name:             Intel(R) Xeon(R) Platinum 8480+
+    CPU family:           6
+    Model:                143
+    Thread(s) per core:   2
+    Core(s) per socket:   56
+    Socket(s):            1
+    Stepping:             8
+    CPU max MHz:          3800.0000
+    CPU min MHz:          800.0000
+Caches (sum of all):
+  L1d:                    2.6 MiB (56 instances)
+  L2:                     112 MiB (56 instances)
+  L3:                     105 MiB (1 instance)
+
+$ grep -m1 flags /proc/cpuinfo | tr ' ' '\n' | grep -E '^(sse4_2|avx|avx2|fma|avx512f|avx512dq|avx512bw|avx512vl|avx512_fp16)$' | sort
+avx
+avx2
+avx512_fp16
+avx512bw
+avx512dq
+avx512f
+avx512vl
+fma
+sse4_2

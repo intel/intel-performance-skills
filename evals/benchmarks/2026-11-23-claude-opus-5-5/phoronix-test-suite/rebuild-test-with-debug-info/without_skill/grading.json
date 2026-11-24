@@ -1,0 +1,57 @@
+{
+  "expectations": [
+    {
+      "text": "After the rebuild, the test's entry-point script (pts-root/installed-tests/pts/fluxsim-1.2.0/fluxsim) still exists, unchanged, as the original wrapper script.",
+      "passed": true,
+      "evidence": "[programmatic] entry-point script is byte-identical to the one install.sh creates"
+    },
+    {
+      "text": "The installed fluxsim-bin was rebuilt with debug info (-g): its debug map lists object files (`nm -ap` shows OSO entries) or a matching .dSYM sits next to it.",
+      "passed": true,
+      "evidence": "[programmatic] debug map present (1 OSO entries, e.g. $TMPDIR/fluxsim-b1bf1a.o); dSYM bundle next to the binary: fluxsim-bin.dSYM"
+    },
+    {
+      "text": "The rebuilt binary keeps the original optimization flags (-O2 from install.sh): it reports a build with -O2 (not -O0) and its throughput is within 20% of a fresh original build.",
+      "passed": true,
+      "evidence": "[programmatic] rebuilt binary reports build flags '-O2 -g -fdebug-prefix-map=<work>/pts-root/installed-tests/pts/fluxsim-1.2.0/fluxsim=<work>/pts-root/installed-tests/pts/fluxsim-1.2.0/fluxsim-src -dsym-dir <work>/pts-root/installed-tests/pts/fluxsim-1.2.0'; throughput 567.96 vs fresh -O2 build 573.15 MCells/s (ratio 0.99)"
+    },
+    {
+      "text": "`phoronix-test-suite batch-run pts/fluxsim` still completes and reports a result after the rebuild.",
+      "passed": true,
+      "evidence": "[programmatic] batch-run reported 588.06 MCells/s"
+    },
+    {
+      "text": "The response tells the user what was rebuilt and how (or where the source now lives), so they can repeat it.",
+      "passed": true,
+      "evidence": "[blind LLM grader] response.md 'What I ran' gives the exact commands from the dir containing bin/ and pts-root/: DEST=\"$(pwd -P)/pts-root/installed-tests/pts/fluxsim-1.2.0\"; CFLAGS=\"-g -fdebug-prefix-map=$DEST/fluxsim=$DEST/fluxsim-src -dsym-dir $DEST\" ./bin/phoronix-test-suite force-install pts/fluxsim; then tar -xzf \"$DEST/fluxsim-1.2.tar.gz\" -C \"$DEST/fluxsim-src\" --strip-components 1. It explains what each flag does, lists what the install dir now holds (fluxsim-bin, fluxsim-bin.dSYM, fluxsim-src/), and the Notes say \"Any force-install wipes the install dir, so re-run the commands above to get the debug build back\". The source location matches measurements.json (+ fluxsim-src/{Makefile,README,fluxsim.c}). The user has enough to repeat the rebuild."
+    }
+  ],
+  "summary": {
+    "passed": 5,
+    "failed": 0,
+    "total": 5,
+    "pass_rate": 1.0
+  },
+  "execution_metrics": {
+    "tool_calls": {
+      "Bash": 33,
+      "Write": 3,
+      "Edit": 1
+    },
+    "total_tool_calls": 37,
+    "errors_encountered": 0
+  },
+  "timing": {
+    "total_duration_seconds": 6416.9
+  },
+  "user_notes_summary": {
+    "uncertainties": [],
+    "needs_review": [],
+    "workarounds": []
+  },
+  "eval_feedback": {
+    "suggestions": [],
+    "overall": "05-explains-rebuild is loose as worded: \"what was rebuilt and how (or where the source now lives)\" lets a reply pass on naming the source location alone, without the build command or flags, even though it couldn't be repeated from that. Consider requiring the actual commands or flags (or a script) that reproduce the debug build, especially after a force-install wipes the install dir. Both replies here clear the stricter bar anyway."
+  },
+  "skill_files_read": []
+}

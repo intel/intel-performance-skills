@@ -1,0 +1,517 @@
+{
+  "metadata": {
+    "skill_name": "performance-patterns",
+    "skill_path": "skills/performance-patterns",
+    "executor_model": "claude-opus-5-5",
+    "analyzer_model": "claude-opus-5-5",
+    "timestamp": "2026-11-24T04:19:24Z",
+    "evals_run": [
+      "avx2-scale-function-with-dispatch",
+      "crc32c-table-lookup-rewrite",
+      "dot-product-review-mixed-fleet",
+      "percentile-sort-with-nan-samples",
+      "startup-config-loader-not-hot"
+    ],
+    "runs_per_configuration": 1
+  },
+  "runs": [
+    {
+      "eval_id": "avx2-scale-function-with-dispatch",
+      "eval_name": "avx2-scale-function-with-dispatch",
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 5,
+        "failed": 0,
+        "total": 5,
+        "time_seconds": 6985.1,
+        "tokens": 233239,
+        "tool_calls": 53,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "scale.c builds for x86-64 with plain `cc -O2 -fPIC -c` (no extra -m flags) and defines `scale_f32` with the requested signature.",
+          "passed": true,
+          "evidence": "[programmatic] builds with plain -O2 -fPIC"
+        },
+        {
+          "text": "On a CPU without AVX2, scale_f32 sets dst[i] = src[i] * k exactly for every element, for lengths 0 to 100 and several thousand (including lengths that are not a multiple of 8) and for unaligned pointers.",
+          "passed": true,
+          "evidence": "[programmatic] CPU without AVX2: cases=654 fails=0 inplace_mismatches=0"
+        },
+        {
+          "text": "On a CPU with AVX2, scale_f32 gives the same exact results for the same lengths and alignments.",
+          "passed": true,
+          "evidence": "[programmatic] AVX2 CPU: cases=654 fails=0 inplace_mismatches=0"
+        },
+        {
+          "text": "The AVX2 path is selected at runtime from CPU feature detection (e.g. `__builtin_cpu_supports(\"avx2\")`, cpuid, `target_clones` or an ifunc), not only by a compile-time `#ifdef __AVX2__`.",
+          "passed": true,
+          "evidence": "[blind LLM grader] scale.c:113-117 in the first-call resolver runs `__builtin_cpu_init(); if (__builtin_cpu_supports(\"avx2\")) fn = scale_f32_avx2;` and stores the result in scale_f32_impl (line 121). The only compile-time guard is `__GNUC__` plus x86 (line 33); there is no `__AVX2__`."
+        },
+        {
+          "text": "The code handles aliasing deliberately: if it marks dst or src `restrict`, the response or a code comment states that dst and src must not overlap (so in-place calls with dst == src are not allowed); otherwise it leaves `restrict` off so in-place calls keep working.",
+          "passed": true,
+          "evidence": "[blind LLM grader] scale.c has no `restrict`. The comment at scale.c:43-45 says \"No restrict on dst/src: in-place use is expected\". The gap check at lines 58-61 sends calls where dst starts 1..31 bytes after src to the scalar loop, so every overlap matches the plain loop. The response says \"Overlapping buffers are handled; there's no `restrict`.\" The programmatic run shows inplace_mismatches=0 on both paths."
+        }
+      ],
+      "notes": [
+        "Saw its own case's grader file names in a directory listing of the skill folder (no file contents)."
+      ]
+    },
+    {
+      "eval_id": "crc32c-table-lookup-rewrite",
+      "eval_name": "crc32c-table-lookup-rewrite",
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 4,
+        "failed": 0,
+        "total": 4,
+        "time_seconds": 10294.9,
+        "tokens": 443621,
+        "tool_calls": 130,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "The new implementation builds with plain `cc -O2 -fPIC` for x86-64 and returns exactly what the original crc32c() returns (same seed convention) for random buffers of 0 to 70,000 bytes at unaligned addresses, for chained calls, and for the '123456789' check string (0xE3069283 after the final inversion), with and without AVX available.",
+          "passed": true,
+          "evidence": "[programmatic] CPU without AVX (SSE4.2+PCLMUL): cases=652 fails=0 | throughput_64k_GBps new=35.80 original=0.51 | throughput_4k_GBps new=35.33 original=0.51\nAVX2 CPU (no AVX-512): cases=652 fails=0 | throughput_64k_GBps new=65.77 original=0.51 | throughput_4k_GBps new=63.13 original=0.51"
+        },
+        {
+          "text": "On SSE4.2 CPUs the new implementation uses the hardware CRC32 instruction (`_mm_crc32_u64`/`crc32q`) and/or PCLMULQDQ folding rather than a byte-at-a-time table lookup.",
+          "passed": true,
+          "evidence": "[blind LLM grader] crc32c_fast.c:453-470 crc32c_hw feeds 8-byte words to `_mm_crc32_u64`. The dispatcher (760-795, list at 741-750) picks the sse4.2 / sse4.2-pclmul / avx2 / avx512 kernels from the CPUID SSE4.2 bit. The byte table is only the 'portable' last fallback. measurements.json shows crc32 (plus pclmul) in all four SIMD functions, and the no-AVX CPU ran at 35.8 GB/s against 0.51 GB/s for the original."
+        },
+        {
+          "text": "The fast path removes the serial dependency of a single CRC chain, e.g. by running several independent CRC streams over different parts of the buffer and combining them, or by folding with PCLMULQDQ, instead of feeding one `_mm_crc32_u64` accumulator 8 bytes at a time.",
+          "passed": true,
+          "evidence": "[blind LLM grader] crc32c_fast.c:520-534 crc32c_3way_block runs three independent crc32 streams (c0/c1/c2) over separate thirds of each block and merges them with PCLMULQDQ shifts (crc32c_shift). This is the Westmere (sse4.2-pclmul) path. The avx2 block (581-619) adds 4 xmm PCLMUL folding accumulators beside 3 crc32 streams, and the avx512 block (654-704) uses 4 zmm folds plus 4 crc32 streams. Only CPUs without PCLMUL (none in the fleet) or inputs under 80 bytes use a single chain."
+        },
+        {
+          "text": "There is a VPCLMULQDQ/AVX-512 code path that is selected at runtime on CPUs that support it (Ice Lake / Sapphire Rapids).",
+          "passed": true,
+          "evidence": "[blind LLM grader] crc32c_fast.c:646-721 crc32c_avx512 folds 4 zmm accumulators with `_mm512_clmulepi64_epi128`. It is the first entry in crc32c_impls (742-745) and is chosen when CPUID leaf 7 shows AVX512F (EBX bit 16) and VPCLMULQDQ (ECX bit 10) and XCR0&0xe6 is set (789-792), subject to the startup self-test. It is compiled in on GCC>=8 / clang>=6. measurements.json shows zmm and pclmul in _crc32c_avx512 from the production build, and tests/emu_avx512.h with run_tests.sh checks the kernel's algorithm through an emulator."
+        }
+      ],
+      "notes": [
+        "Saw its own case's grader file names in a directory listing of the skill folder (no file contents).",
+        "Run was cut off by the account's usage limit before it wrote its final reply."
+      ]
+    },
+    {
+      "eval_id": "dot-product-review-mixed-fleet",
+      "eval_name": "dot-product-review-mixed-fleet",
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 6,
+        "failed": 0,
+        "total": 6,
+        "time_seconds": 6991.3,
+        "tokens": 277321,
+        "tool_calls": 46,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "The response identifies the loop-carried dependency on `sum` (each addition has to wait for the previous one to finish) as the main bottleneck, rather than memory bandwidth.",
+          "passed": true,
+          "evidence": "[blind LLM grader] response.md:11 'One accumulator means one long dependency chain. This is the main problem. Each += needs the previous sum, so the loop does one element per floating-point add latency (about 3-4 cycles)'. It brings up memory bandwidth only for data coming from main memory (line 100)."
+        },
+        {
+          "text": "The response warns that the optimized version reorders the floating-point additions, so its results can differ slightly (rounding) from the original loop.",
+          "passed": true,
+          "evidence": "[blind LLM grader] response.md:42, under 'Floating-point behaviour (please read)': 'Results won't be bit-identical to the old dot(). The additions happen in a different order ... The differences are at rounding level'."
+        },
+        {
+          "text": "dot_fast.c chooses its implementation at runtime from CPU feature detection (`__builtin_cpu_supports`, cpuid, `target_clones` or an ifunc), so one binary uses AVX2 or AVX-512 where available and still runs on CPUs without AVX.",
+          "passed": true,
+          "evidence": "[blind LLM grader] dot_fast.c:231-240 picks dot_avx512, dot_avx2 or dot_sse2 with __builtin_cpu_supports('avx2'/'fma'/'avx512f') on the first call and caches the choice in a function pointer (248-263). The SSE2 baseline and the dispatcher have no target attribute, and the programmatic no-AVX run passed."
+        },
+        {
+          "text": "The widest SIMD path in dot_fast.c keeps at least two independent vector accumulators in its main loop, rather than a single accumulator register.",
+          "passed": true,
+          "evidence": "[blind LLM grader] The widest path, dot_avx512 (dot_fast.c:183-226), declares 8 __m512 accumulators s0..s7, and its main loop (198-201) does one _mm512_fmadd_ps into each."
+        },
+        {
+          "text": "dot_fast.c builds with plain `cc -O2 -fPIC` for x86-64 and, on a CPU without AVX, returns results within 1e-4 relative error of a double-precision reference, including lengths that are not a multiple of the vector width.",
+          "passed": true,
+          "evidence": "[programmatic] CPU without AVX: cases=66 fails=0 worst_relerr=4.44e-08"
+        },
+        {
+          "text": "On a CPU with AVX2 and FMA, dot_fast.c returns results within 1e-4 relative error of a double-precision reference, including lengths that are not a multiple of the vector width.",
+          "passed": true,
+          "evidence": "[programmatic] AVX2+FMA CPU: cases=66 fails=0 worst_relerr=5.73e-08"
+        }
+      ],
+      "notes": [
+        "Saw its own case's grader file names in a directory listing of the skill folder (no file contents)."
+      ]
+    },
+    {
+      "eval_id": "percentile-sort-with-nan-samples",
+      "eval_name": "percentile-sort-with-nan-samples",
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 6,
+        "failed": 0,
+        "total": 6,
+        "time_seconds": 6781.8,
+        "tokens": 215951,
+        "tool_calls": 54,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "The response points out that sorting the samples with NaNs in them using std::sort/operator< is invalid (NaN breaks the strict weak ordering), so the existing assumption that NaNs end up at the back isn't guaranteed.",
+          "passed": true,
+          "evidence": "[blind LLM grader] response.md: \"`std::sort` needs a strict weak ordering, and `operator<` stops being one once NaN is present. That is undefined behaviour, and the comment \\\"NaNs end up at the back\\\" isn't what happens\". A demo (bench/nan_sort_demo.cpp) shows about 99% of the NaNs landing inside the first `ok` slots."
+        },
+        {
+          "text": "percentiles_fast.cpp handles NaN samples correctly: it removes or partitions them out before sorting/selecting, or passes hasnan=true to x86-simd-sort, and still reports the failed count.",
+          "passed": true,
+          "evidence": "[blind LLM grader] percentiles_fast.cpp:93-99: a branch-free pass compacts the non-NaN values to the front (bit-pattern NaN test) and sets failed = n - ok. Lines 106-113: selection runs only over [0, ok). Lines 72-74: qselect gets hasnan=false, which is valid only because the NaNs were already removed, as the code comments state. failed is returned, and programmatic 06 passes."
+        },
+        {
+          "text": "The new version avoids fully sorting every sample just to read four percentiles, using a selection algorithm (std::nth_element, x86simdsort::qselect, a partial sort or similar).",
+          "passed": true,
+          "evidence": "[blind LLM grader] percentiles_fast.cpp:69-78 and 103-113: four selections in ascending order on shrinking ranges, using std::nth_element or x86simdsort::qselect. There is no sort, and the reply says the total work is about n + n/2 + n/10 + n/100."
+        },
+        {
+          "text": "The response recommends the x86-simd-sort library (e.g. `x86simdsort::qsort`, `qselect` or `partial_qsort`) for the AVX-512 machines.",
+          "passed": true,
+          "evidence": "[blind LLM grader] response.md line 1: \"on Sapphire Rapids it can optionally use x86-simd-sort's AVX-512 quickselect\". Line 37: -DPERCENTILES_USE_X86SIMDSORT calls `x86simdsort::qselect(..., /*hasnan=*/false)` with runtime AVX-512/AVX2 dispatch. Lines 79-84 give clone, build and bench steps for the SPR box. The code comment (line 23) says \"recommended on Sapphire Rapids\"."
+        },
+        {
+          "text": "percentiles_fast.cpp compiles as C++17 for x86-64 (against the real x86-simd-sort headers if it uses that library) and keeps `Percentiles compute_percentiles(std::vector<float>)`.",
+          "passed": true,
+          "evidence": "[programmatic] x86-simd-sort runtime-dispatch API (lib/x86simdsort.h), linked with libx86simdsortcpp.a: compiles and links"
+        },
+        {
+          "text": "On test data that contains NaNs, compute_percentiles in percentiles_fast.cpp returns the same p50/p90/p99/p999 values and failed count as a reference that drops the NaNs, sorts, and reads the same indices.",
+          "passed": true,
+          "evidence": "[programmatic] CPU without AVX: cases=9 fails=0 new_total_seconds=0.027\nAVX2 CPU: cases=9 fails=0 new_total_seconds=0.027"
+        }
+      ],
+      "notes": [
+        "Saw its own case's grader file names in a directory listing of the skill folder (no file contents)."
+      ]
+    },
+    {
+      "eval_id": "startup-config-loader-not-hot",
+      "eval_name": "startup-config-loader-not-hot",
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 3,
+        "failed": 0,
+        "total": 3,
+        "time_seconds": 545.6,
+        "tokens": 123865,
+        "tool_calls": 39,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "The response concludes that config_load runs once at startup on a small file, so nothing in it is worth optimizing for speed (any suggestions are explicitly framed as optional or negligible).",
+          "passed": true,
+          "evidence": "[blind LLM grader] response.md:1 'there's nothing in config.c worth optimizing. From a performance standpoint, merge it as is'; :15 'All the parsing put together costs about 4 µs, once per process. Making it infinitely fast would not show up in startup time'; :17 'This loop runs at most 64 iterations once at startup' (88-line config). The only perf suggestion (:46) is about per-request backend selection outside this file, and it only applies 'If profiling shows backend selection is hot', so it is optional."
+        },
+        {
+          "text": "The response does not recommend rewriting the weight-normalisation loops with SIMD, multiple accumulators, or similar micro-optimizations (mentioning them only to say they're not worth it is fine).",
+          "passed": true,
+          "evidence": "[blind LLM grader] response.md:17 'Parallel accumulators or SIMD would add complexity and change how the weights round, to save about 35 ns': raised only to reject it. The patch's float->double total (suggested-fixes.diff:90-100) is labelled an overflow correctness fix, not a speed change, and the loop stays a plain serial scalar loop."
+        },
+        {
+          "text": "The response does not recommend adding performance annotations such as `restrict`, `__attribute__((cold))`/`[[gnu::cold]]`, `__builtin_expect` or prefetching to this startup-only code (mentioning them only to say they're not worth it is fine).",
+          "passed": true,
+          "evidence": "[blind LLM grader] response.md:17 'pointer parameters without restrict, and error reporters without cold. Those fixes only pay off in hot loops': raised only to reject them. suggested-fixes.diff, bench.c and dump.c contain no restrict, cold, __builtin_expect or prefetch (grep finds nothing)."
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": "avx2-scale-function-with-dispatch",
+      "eval_name": "avx2-scale-function-with-dispatch",
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 5,
+        "failed": 0,
+        "total": 5,
+        "time_seconds": 6651.1,
+        "tokens": 165802,
+        "tool_calls": 26,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "scale.c builds for x86-64 with plain `cc -O2 -fPIC -c` (no extra -m flags) and defines `scale_f32` with the requested signature.",
+          "passed": true,
+          "evidence": "[programmatic] builds with plain -O2 -fPIC"
+        },
+        {
+          "text": "On a CPU without AVX2, scale_f32 sets dst[i] = src[i] * k exactly for every element, for lengths 0 to 100 and several thousand (including lengths that are not a multiple of 8) and for unaligned pointers.",
+          "passed": true,
+          "evidence": "[programmatic] CPU without AVX2: cases=654 fails=0 inplace_mismatches=0"
+        },
+        {
+          "text": "On a CPU with AVX2, scale_f32 gives the same exact results for the same lengths and alignments.",
+          "passed": true,
+          "evidence": "[programmatic] AVX2 CPU: cases=654 fails=0 inplace_mismatches=0"
+        },
+        {
+          "text": "The AVX2 path is selected at runtime from CPU feature detection (e.g. `__builtin_cpu_supports(\"avx2\")`, cpuid, `target_clones` or an ifunc), not only by a compile-time `#ifdef __AVX2__`.",
+          "passed": true,
+          "evidence": "[blind LLM grader] scale.c:82-102 cpu_has_avx2() checks the CPUID max leaf, leaf 1 OSXSAVE+AVX, XGETBV XCR0&0x6 and leaf 7 EBX bit_AVX2. The first-call resolver at scale.c:116 does `cpu_has_avx2() ? scale_f32_avx2 : scale_f32_scalar` and stores the result in a function pointer (line 120). The only compile-time guard is for arch and compiler (lines 35-40); there is no `#ifdef __AVX2__`."
+        },
+        {
+          "text": "The code handles aliasing deliberately: if it marks dst or src `restrict`, the response or a code comment states that dst and src must not overlap (so in-place calls with dst == src are not allowed); otherwise it leaves `restrict` off so in-place calls keep working.",
+          "passed": true,
+          "evidence": "[blind LLM grader] scale.c never uses `restrict`. The header comment at scale.c:12-13 says \"Aliasing: dst may equal src (in-place scaling); otherwise the two ranges must not overlap.\" The response repeats this: \"Contract: `dst == src` (in-place) works\". The AVX2 kernel loads each chunk before storing it (lines 57-68), so in-place calls are safe, and the programmatic run shows inplace_mismatches=0 on both paths."
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": "crc32c-table-lookup-rewrite",
+      "eval_name": "crc32c-table-lookup-rewrite",
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 4,
+        "failed": 0,
+        "total": 4,
+        "time_seconds": 10380.9,
+        "tokens": 409315,
+        "tool_calls": 93,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "The new implementation builds with plain `cc -O2 -fPIC` for x86-64 and returns exactly what the original crc32c() returns (same seed convention) for random buffers of 0 to 70,000 bytes at unaligned addresses, for chained calls, and for the '123456789' check string (0xE3069283 after the final inversion), with and without AVX available.",
+          "passed": true,
+          "evidence": "[programmatic] CPU without AVX (SSE4.2+PCLMUL): cases=652 fails=0 | throughput_64k_GBps new=36.14 original=0.50 | throughput_4k_GBps new=34.14 original=0.51\nAVX2 CPU (no AVX-512): cases=652 fails=0 | throughput_64k_GBps new=35.77 original=0.51 | throughput_4k_GBps new=34.07 original=0.50"
+        },
+        {
+          "text": "On SSE4.2 CPUs the new implementation uses the hardware CRC32 instruction (`_mm_crc32_u64`/`crc32q`) and/or PCLMULQDQ folding rather than a byte-at-a-time table lookup.",
+          "passed": true,
+          "evidence": "[blind LLM grader] crc32c_fast.c:300-320 crc32c_x86_sse42 uses `_mm_crc32_u64`. CPUs with SSE4.2 and PCLMUL get crc32c_x86_3way (332-384), selected from CPUID ECX bits 20 and 1 (612-645, list at 682-690). The table is only the 'portable' last fallback. measurements.json shows crc32 in every x86 function, and the no-AVX CPU ran at 36.1 GB/s against 0.50 GB/s for the original."
+        },
+        {
+          "text": "The fast path removes the serial dependency of a single CRC chain, e.g. by running several independent CRC streams over different parts of the buffer and combining them, or by folding with PCLMULQDQ, instead of feeding one `_mm_crc32_u64` accumulator 8 bytes at a time.",
+          "passed": true,
+          "evidence": "[blind LLM grader] crc32c_fast.c:343-374 runs three independent crc32q streams (c0/c1/c2) at p, p+klen and p+2*klen, then stitches them into the block's last word with CLMUL_SCALAR (PCLMULQDQ) and chains the next block the same way. This is the Westmere path (x86-sse42-3way). The hybrid kernel (401-477) adds 4 xmm PCLMUL folding accumulators, and the AVX-512 kernel (503-592) uses 8 zmm folding accumulators. Only inputs under 128 bytes use one stream."
+        },
+        {
+          "text": "There is a VPCLMULQDQ/AVX-512 code path that is selected at runtime on CPUs that support it (Ice Lake / Sapphire Rapids).",
+          "passed": true,
+          "evidence": "[blind LLM grader] crc32c_fast.c:503-600 crc32c_x86_avx512 folds 8 zmm accumulators with `_mm512_clmulepi64_epi128`. It is the first entry in crc32c_impls (683-685) and needs CRC32C_HAS_AVX512: leaf 7 EBX bit 16, ECX bit 10 and XCR0&0xe6 (641-642), plus AVX2 and passing the self-test. It is built by default (GCC>=8 / clang>=8; only -DCRC32C_NO_AVX512 removes it). measurements.json shows zmm and pclmul in _crc32c_x86_avx512, and test/avx512_emu.h with the Makefile's test-emu checks the kernel through an emulator."
+        }
+      ],
+      "notes": [
+        "Run was cut off by the account's usage limit before it wrote its final reply."
+      ]
+    },
+    {
+      "eval_id": "dot-product-review-mixed-fleet",
+      "eval_name": "dot-product-review-mixed-fleet",
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 6,
+        "failed": 0,
+        "total": 6,
+        "time_seconds": 8177.2,
+        "tokens": 285947,
+        "tool_calls": 59,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "The response identifies the loop-carried dependency on `sum` (each addition has to wait for the previous one to finish) as the main bottleneck, rather than memory bandwidth.",
+          "passed": true,
+          "evidence": "[blind LLM grader] response.md:5, the first item under 'What's slow in the original': 'Every add waits for the previous one ... one long chain of dependent adds, so the loop runs at one element per add latency ... however wide the CPU is'. It brings up memory bandwidth only for data coming from DRAM (line 67)."
+        },
+        {
+          "text": "The response warns that the optimized version reorders the floating-point additions, so its results can differ slightly (rounding) from the original loop.",
+          "passed": true,
+          "evidence": "[blind LLM grader] response.md:21 'Results do change in the last bits compared with the old sequential sum; any reordering does that'. Line 6 also says splitting the chain 'reorders float additions, which changes rounding'."
+        },
+        {
+          "text": "dot_fast.c chooses its implementation at runtime from CPU feature detection (`__builtin_cpu_supports`, cpuid, `target_clones` or an ifunc), so one binary uses AVX2 or AVX-512 where available and still runs on CPUs without AVX.",
+          "passed": true,
+          "evidence": "[blind LLM grader] dot_fast.c:152-168 checks CPUID leaf 1 for OSXSAVE and AVX, XGETBV for XCR0&6, and leaf 7 EBX bit 5 for AVX2. dot() (172-184) caches the result and calls dot_avx2 or dot_sse2. There is no AVX-512 path, which is deliberate (response.md:71), but the assertion says 'AVX2 or AVX-512'. The programmatic no-AVX run passed."
+        },
+        {
+          "text": "The widest SIMD path in dot_fast.c keeps at least two independent vector accumulators in its main loop, rather than a single accumulator register.",
+          "passed": true,
+          "evidence": "[blind LLM grader] The widest path, dot_avx2 (dot_fast.c:105-123), declares 4 __m256 accumulators s0..s3, and its main loop (114-123) does a separate mul+add into each."
+        },
+        {
+          "text": "dot_fast.c builds with plain `cc -O2 -fPIC` for x86-64 and, on a CPU without AVX, returns results within 1e-4 relative error of a double-precision reference, including lengths that are not a multiple of the vector width.",
+          "passed": true,
+          "evidence": "[programmatic] CPU without AVX: cases=66 fails=0 worst_relerr=5.73e-08"
+        },
+        {
+          "text": "On a CPU with AVX2 and FMA, dot_fast.c returns results within 1e-4 relative error of a double-precision reference, including lengths that are not a multiple of the vector width.",
+          "passed": true,
+          "evidence": "[programmatic] AVX2+FMA CPU: cases=66 fails=0 worst_relerr=5.73e-08"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": "percentile-sort-with-nan-samples",
+      "eval_name": "percentile-sort-with-nan-samples",
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 0.8333,
+        "passed": 5,
+        "failed": 1,
+        "total": 6,
+        "time_seconds": 7316.8,
+        "tokens": 247681,
+        "tool_calls": 49,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "The response points out that sorting the samples with NaNs in them using std::sort/operator< is invalid (NaN breaks the strict weak ordering), so the existing assumption that NaNs end up at the back isn't guaranteed.",
+          "passed": true,
+          "evidence": "[blind LLM grader] response.md: \"`std::sort` with NaNs is undefined behaviour, because `<` is not a strict weak ordering once NaN is involved. The comment \\\"NaNs end up at the back\\\" is wrong for libstdc++\". It backs this up with a demonstration: the first NaN landed at index 178 and only 8 of 9,853 NaNs ended up in the tail."
+        },
+        {
+          "text": "percentiles_fast.cpp handles NaN samples correctly: it removes or partitions them out before sorting/selecting, or passes hasnan=true to x86-simd-sort, and still reports the failed count.",
+          "passed": true,
+          "evidence": "[blind LLM grader] percentiles_fast.cpp:84-87: the small path runs remove_if on NaNs (bit-pattern test) before nth_element, with failed = size - ok. Lines 135-155: the large path puts every NaN into its own kNaNBin, sets failed = count(kNaNBin) and ok = n - failed, and the rank walk covers only the non-NaN bins. Pass 2 skips NaNs (line 192). The failed count is returned. This excludes NaNs from selection, equivalent to partitioning them out, and programmatic 06 passes."
+        },
+        {
+          "text": "The new version avoids fully sorting every sample just to read four percentiles, using a selection algorithm (std::nth_element, x86simdsort::qselect, a partial sort or similar).",
+          "passed": true,
+          "evidence": "[blind LLM grader] percentiles_fast.cpp:127-231: an exact two-pass radix/histogram select for n >= 40K. Lines 93-104: nested std::nth_element on shrinking ranges for small n. std::sort is never called."
+        },
+        {
+          "text": "The response recommends the x86-simd-sort library (e.g. `x86simdsort::qsort`, `qselect` or `partial_qsort`) for the AVX-512 machines.",
+          "passed": false,
+          "evidence": "[blind LLM grader] response.md never mentions x86-simd-sort, qselect, qsort or any SIMD sort library. Its only AVX references are the avx512 memmove symbol and the caveat that no AVX-512 machine was available. For SPR it says -march=sapphirerapids \"would only widen the block test\"."
+        },
+        {
+          "text": "percentiles_fast.cpp compiles as C++17 for x86-64 (against the real x86-simd-sort headers if it uses that library) and keeps `Percentiles compute_percentiles(std::vector<float>)`.",
+          "passed": true,
+          "evidence": "[programmatic] plain C++17 build: compiles and links"
+        },
+        {
+          "text": "On test data that contains NaNs, compute_percentiles in percentiles_fast.cpp returns the same p50/p90/p99/p999 values and failed count as a reference that drops the NaNs, sorts, and reads the same indices.",
+          "passed": true,
+          "evidence": "[programmatic] CPU without AVX: cases=9 fails=0 new_total_seconds=0.006\nAVX2 CPU: cases=9 fails=0 new_total_seconds=0.004"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": "startup-config-loader-not-hot",
+      "eval_name": "startup-config-loader-not-hot",
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 3,
+        "failed": 0,
+        "total": 3,
+        "time_seconds": 355.0,
+        "tokens": 78732,
+        "tool_calls": 20,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "The response concludes that config_load runs once at startup on a small file, so nothing in it is worth optimizing for speed (any suggestions are explicitly framed as optional or negligible).",
+          "passed": true,
+          "evidence": "[blind LLM grader] response.md:1 'There's nothing in config.c worth optimizing, and I'd merge it as-is from a performance standpoint'; :3 'config_load() runs once at startup on a file of 100 lines or fewer, so it isn't a hot path'; :16 'it's tens of microseconds, once. Any performance change would only add code and risk.' It makes no perf suggestions."
+        },
+        {
+          "text": "The response does not recommend rewriting the weight-normalisation loops with SIMD, multiple accumulators, or similar micro-optimizations (mentioning them only to say they're not worth it is fine).",
+          "passed": true,
+          "evidence": "[blind LLM grader] The reply never recommends SIMD or multiple accumulators. Its only mention of tuning is a dismissal (:13 'hand-tuning trim/strcmp/snprintf won't either'). The weight item (:20) is about isfinite validation, which is correctness. perf_check/ files contain no such code (grep finds nothing)."
+        },
+        {
+          "text": "The response does not recommend adding performance annotations such as `restrict`, `__attribute__((cold))`/`[[gnu::cold]]`, `__builtin_expect` or prefetching to this startup-only code (mentioning them only to say they're not worth it is fine).",
+          "passed": true,
+          "evidence": "[blind LLM grader] The reply recommends no restrict, cold, __builtin_expect or prefetching, and perf_check/bench.c and dump.c contain none (grep finds nothing). Every suggestion is about correctness (isfinite, strtol, line-too-long check, snprintf return value, ferror)."
+        }
+      ],
+      "notes": []
+    }
+  ],
+  "run_summary": {
+    "with_skill": {
+      "pass_rate": {
+        "mean": 1.0,
+        "stddev": 0.0,
+        "min": 1.0,
+        "max": 1.0
+      },
+      "time_seconds": {
+        "mean": 6319.74,
+        "stddev": 3544.3542,
+        "min": 545.6,
+        "max": 10294.9
+      },
+      "tokens": {
+        "mean": 258799.4,
+        "stddev": 117472.0022,
+        "min": 123865,
+        "max": 443621
+      }
+    },
+    "without_skill": {
+      "pass_rate": {
+        "mean": 0.9667,
+        "stddev": 0.0746,
+        "min": 0.8333,
+        "max": 1.0
+      },
+      "time_seconds": {
+        "mean": 6576.2,
+        "stddev": 3751.5454,
+        "min": 355.0,
+        "max": 10380.9
+      },
+      "tokens": {
+        "mean": 237495.4,
+        "stddev": 124818.9085,
+        "min": 78732,
+        "max": 409315
+      }
+    },
+    "delta": {
+      "pass_rate": "+0.03",
+      "time_seconds": "-256.5",
+      "tokens": "+21304"
+    }
+  },
+  "notes": [
+    "Executor: claude-opus-5-5 subagents, one run per configuration. Single runs can't separate a one-assertion difference from run-to-run noise.",
+    "Wall-clock times are not comparable: the first 20 runs shared one account's rate limit concurrently (most took ~2 h); the two later runs (phoronix-test-suite optimize-test-end-to-end with skills, linux-perf spinlock-scaling-collapse without skills) ran in a smaller batch.",
+    "Code correctness didn't differ: every programmatic check passed in both configurations. dot() and scale_f32() were correct with and without AVX2, CRC32C was bit-exact including the seed-convention trap, and percentiles matched the NaN-free reference.",
+    "The only scored difference is percentile 04 (recommends x86-simd-sort). But the baseline's exact radix select ran about 5x faster than the with-skill version on the same test sets (0.004-0.006 s vs 0.027 s under Rosetta), so this assertion rewards following the skill rather than the better result. A measured-speed assertion would be fairer.",
+    "Differences no assertion captured: the with-skill CRC32C AVX2 path measured 65.8 vs 35.8 GB/s under Rosetta (emulated, indicative only); the baseline's fastest kernel only runs on Intel CPUs that report ADX. The with-skill dot_fast.c added AVX-512 and FMA kernels and warned that results then differ between CPUs; the baseline deliberately stayed with AVX2 without FMA, so every CPU in the fleet returns bit-identical results. In avx2-scale, the with-skill version gives the plain-loop result for any overlap of src and dst, while the baseline allows only exact in-place calls.",
+    "Over-engineering check (startup-config): neither configuration pushed micro-optimizations onto startup-only code.",
+    "Both CRC32C runs were cut off by the account usage limit before writing a reply; their code was graded as-is.",
+    "4 of 5 with-skill runs saw their own grader file names in a directory listing; since the two configurations scored about the same, that doesn't change the conclusion."
+  ]
+}

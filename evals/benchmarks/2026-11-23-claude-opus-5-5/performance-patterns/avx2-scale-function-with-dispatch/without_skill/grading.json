@@ -1,0 +1,57 @@
+{
+  "expectations": [
+    {
+      "text": "scale.c builds for x86-64 with plain `cc -O2 -fPIC -c` (no extra -m flags) and defines `scale_f32` with the requested signature.",
+      "passed": true,
+      "evidence": "[programmatic] builds with plain -O2 -fPIC"
+    },
+    {
+      "text": "On a CPU without AVX2, scale_f32 sets dst[i] = src[i] * k exactly for every element, for lengths 0 to 100 and several thousand (including lengths that are not a multiple of 8) and for unaligned pointers.",
+      "passed": true,
+      "evidence": "[programmatic] CPU without AVX2: cases=654 fails=0 inplace_mismatches=0"
+    },
+    {
+      "text": "On a CPU with AVX2, scale_f32 gives the same exact results for the same lengths and alignments.",
+      "passed": true,
+      "evidence": "[programmatic] AVX2 CPU: cases=654 fails=0 inplace_mismatches=0"
+    },
+    {
+      "text": "The AVX2 path is selected at runtime from CPU feature detection (e.g. `__builtin_cpu_supports(\"avx2\")`, cpuid, `target_clones` or an ifunc), not only by a compile-time `#ifdef __AVX2__`.",
+      "passed": true,
+      "evidence": "[blind LLM grader] scale.c:82-102 cpu_has_avx2() checks the CPUID max leaf, leaf 1 OSXSAVE+AVX, XGETBV XCR0&0x6 and leaf 7 EBX bit_AVX2. The first-call resolver at scale.c:116 does `cpu_has_avx2() ? scale_f32_avx2 : scale_f32_scalar` and stores the result in a function pointer (line 120). The only compile-time guard is for arch and compiler (lines 35-40); there is no `#ifdef __AVX2__`."
+    },
+    {
+      "text": "The code handles aliasing deliberately: if it marks dst or src `restrict`, the response or a code comment states that dst and src must not overlap (so in-place calls with dst == src are not allowed); otherwise it leaves `restrict` off so in-place calls keep working.",
+      "passed": true,
+      "evidence": "[blind LLM grader] scale.c never uses `restrict`. The header comment at scale.c:12-13 says \"Aliasing: dst may equal src (in-place scaling); otherwise the two ranges must not overlap.\" The response repeats this: \"Contract: `dst == src` (in-place) works\". The AVX2 kernel loads each chunk before storing it (lines 57-68), so in-place calls are safe, and the programmatic run shows inplace_mismatches=0 on both paths."
+    }
+  ],
+  "summary": {
+    "passed": 5,
+    "failed": 0,
+    "total": 5,
+    "pass_rate": 1.0
+  },
+  "execution_metrics": {
+    "tool_calls": {
+      "Bash": 20,
+      "Write": 5,
+      "Read": 1
+    },
+    "total_tool_calls": 26,
+    "errors_encountered": 0
+  },
+  "timing": {
+    "total_duration_seconds": 6651.1
+  },
+  "user_notes_summary": {
+    "uncertainties": [],
+    "needs_review": [],
+    "workarounds": []
+  },
+  "eval_feedback": {
+    "suggestions": [],
+    "overall": "Assertion 05 can't tell apart two different aliasing designs. B gives the plain-loop result for every overlap on both CPUs (the gap check plus in-order load/store per chunk). A supports only exact in-place calls and documents partial overlap as disallowed. For an out-of-contract call such as dst = src + 1, A's AVX2 path (four loads, then four stores) gives different results from its scalar fallback, so the output depends on the CPU. No assertion captures this. Assertion 04 accepts raw cpuid as evidence but doesn't require the OS-support check (CPUID.1 OSXSAVE plus XGETBV/XCR0 bits 1-2). A dispatcher that tests only CPUID leaf 7 EBX bit 5 would pass, yet it would SIGILL where the OS or hypervisor leaves AVX state disabled. A does this check explicitly. B relies on __builtin_cpu_supports, whose runtime does it in current GCC and clang. So it doesn't change these grades."
+  },
+  "skill_files_read": []
+}

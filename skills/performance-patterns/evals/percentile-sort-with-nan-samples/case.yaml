@@ -1,0 +1,10 @@
+schema_version: "1.1"
+name: percentile-sort-with-nan-samples
+expected_outcome: |
+  Points out that std::sort on data containing NaN is undefined (NaN breaks strict weak
+  ordering), so the "NaNs end up at the back" assumption is wrong. The new version handles NaN
+  explicitly (partition them out, or x86-simd-sort with hasnan=true), avoids a full sort for
+  four percentiles (selection), and/or uses x86-simd-sort on the AVX-512 machines. It compiles
+  and returns the same percentiles and failed count as a NaN-free reference.
+context:
+  scaffold_script: place-files.sh

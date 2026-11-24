@@ -1,0 +1,9 @@
+schema_version: "1.1"
+name: low-ipc-serial-fma-loop
+expected_outcome: |
+  Diagnoses a latency-bound serial FMA chain on one accumulator (scalar `vfmadd231sd` into
+  %xmm0 holding ~90% of samples) on an AVX-512 CPU, explains why the compiler won't vectorize
+  the FP reduction at -O2, proposes multiple/SIMD accumulators with code and an FP-rounding
+  caveat, and says how to verify with perf.
+context:
+  scaffold_script: place-files.sh

@@ -1,0 +1,12 @@
+{
+  "eval_name": "optimize-test-end-to-end",
+  "prompt": "Profile pts/fluxsim and optimize it. Report the before/after improvement. PTS is a local install here: the CLI is ./bin/phoronix-test-suite and its data directory is ./pts-root (same layout as ~/.phoronix-test-suite). This is a macOS box, so there's no perf; use whatever profiling you can, or reason from the source.\n\nInput files: bin/, pts-root/",
+  "assertions": [
+    "Before changing anything, the agent measures a baseline score with the PTS runner (batch-run or similar) and reports it with its unit (MCells/s).",
+    "After the agent finishes, an independent `phoronix-test-suite batch-run pts/fluxsim` in the sandbox scores at least 2.5x a fresh install of the original test.",
+    "The optimized build still does the same work: the entry-point script is unchanged (same grid size and iteration count) and the benchmark's printed checksum matches the original build's within 1e-9 relative error.",
+    "The final report gives the baseline and new scores and the change in percent, and the claimed improvement is within 25% of what the independent re-run measures.",
+    "The report lists the specific code or build changes made and why each helps (e.g. which loop was the bottleneck).",
+    "The response tells the user where the modified source lives and how to rebuild it, so the change isn't only in an installed binary."
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "expectations": [
+    {
+      "text": "The response concludes that config_load runs once at startup on a small file, so nothing in it is worth optimizing for speed (any suggestions are explicitly framed as optional or negligible).",
+      "passed": true,
+      "evidence": "[blind LLM grader] response.md:1 'There's nothing in config.c worth optimizing, and I'd merge it as-is from a performance standpoint'; :3 'config_load() runs once at startup on a file of 100 lines or fewer, so it isn't a hot path'; :16 'it's tens of microseconds, once. Any performance change would only add code and risk.' It makes no perf suggestions."
+    },
+    {
+      "text": "The response does not recommend rewriting the weight-normalisation loops with SIMD, multiple accumulators, or similar micro-optimizations (mentioning them only to say they're not worth it is fine).",
+      "passed": true,
+      "evidence": "[blind LLM grader] The reply never recommends SIMD or multiple accumulators. Its only mention of tuning is a dismissal (:13 'hand-tuning trim/strcmp/snprintf won't either'). The weight item (:20) is about isfinite validation, which is correctness. perf_check/ files contain no such code (grep finds nothing)."
+    },
+    {
+      "text": "The response does not recommend adding performance annotations such as `restrict`, `__attribute__((cold))`/`[[gnu::cold]]`, `__builtin_expect` or prefetching to this startup-only code (mentioning them only to say they're not worth it is fine).",
+      "passed": true,
+      "evidence": "[blind LLM grader] The reply recommends no restrict, cold, __builtin_expect or prefetching, and perf_check/bench.c and dump.c contain none (grep finds nothing). Every suggestion is about correctness (isfinite, strtol, line-too-long check, snprintf return value, ferror)."
+    }
+  ],
+  "summary": {
+    "passed": 3,
+    "failed": 0,
+    "total": 3,
+    "pass_rate": 1.0
+  },
+  "execution_metrics": {
+    "tool_calls": {
+      "Bash": 16,
+      "Write": 4
+    },
+    "total_tool_calls": 20,
+    "errors_encountered": 0
+  },
+  "timing": {
+    "total_duration_seconds": 355.0
+  },
+  "user_notes_summary": {
+    "uncertainties": [],
+    "needs_review": [],
+    "workarounds": []
+  },
+  "eval_feedback": {
+    "suggestions": [],
+    "overall": ""
+  },
+  "skill_files_read": []
+}

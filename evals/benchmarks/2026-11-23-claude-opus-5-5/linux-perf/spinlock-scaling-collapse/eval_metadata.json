@@ -1,0 +1,12 @@
+{
+  "eval_name": "spinlock-scaling-collapse",
+  "prompt": "This workload doesn't scale past 8 cores: throughput is flat from 8 to 32 threads and drops at 64. Help me find the bottleneck. Everything I collected on the 64-core box is attached: a thread sweep (sweep.txt), perf report at 1 and 64 threads (perf-1t.txt, perf-64t.txt), perf annotate of the function that blows up (annotate-cache_lookup.txt), a perf c2c report at 64 threads (c2c-64t.txt), and the source (lru_cache.c).\n\nInput files: sweep.txt, perf-1t.txt, perf-64t.txt, annotate-cache_lookup.txt, c2c-64t.txt, lru_cache.c",
+  "assertions": [
+    "The response identifies the spin lock in cache_lookup as the bottleneck that grows with thread count, citing that cache_lookup goes from ~30% of cycles at 1 thread to ~72% at 64 and that most of its samples sit on `lock cmpxchg` and `pause`.",
+    "The response explains that the test-and-set loop does an atomic `lock cmpxchg` on every spin iteration, so every waiting thread keeps pulling the lock's cache line into exclusive state, which is why throughput falls at 64 threads.",
+    "The response recommends making waiters spin on a plain read of the lock before retrying the atomic (test-and-test-and-set), or replacing the spinlock with a lock that doesn't hammer the line (a queued/MCS or ticket lock, or a futex-based mutex).",
+    "The response points out, from the c2c offsets, that the lock word shares a cache line with fields written inside the critical section (hits, lru_head/lru_tail) and recommends separating them.",
+    "The response explains that one lock around every lookup will still cap scaling after the spin fix, and recommends reducing serialization, e.g. sharding the cache into independently locked segments or avoiding the per-hit LRU and statistics writes.",
+    "The response does not recommend just switching cache_lookup to a reader-writer lock without dealing with the fact that every hit writes shared state (LRU move-to-front, hits++), which a read lock doesn't allow."
+  ]
+}

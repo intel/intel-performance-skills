@@ -1,0 +1,11 @@
+{
+  "eval_name": "avx2-scale-function-with-dispatch",
+  "prompt": "Write a vectorized AVX2 float array scale function with CPU dispatch.\n\nSignature: `void scale_f32(float *dst, const float *src, float k, size_t n)`, computing dst[i] = src[i] * k. Put it in scale.c. It goes into a library that's built with plain `cc -O2 -fPIC` and also has to run on machines without AVX2.",
+  "assertions": [
+    "scale.c builds for x86-64 with plain `cc -O2 -fPIC -c` (no extra -m flags) and defines `scale_f32` with the requested signature.",
+    "On a CPU without AVX2, scale_f32 sets dst[i] = src[i] * k exactly for every element, for lengths 0 to 100 and several thousand (including lengths that are not a multiple of 8) and for unaligned pointers.",
+    "On a CPU with AVX2, scale_f32 gives the same exact results for the same lengths and alignments.",
+    "The AVX2 path is selected at runtime from CPU feature detection (e.g. `__builtin_cpu_supports(\"avx2\")`, cpuid, `target_clones` or an ifunc), not only by a compile-time `#ifdef __AVX2__`.",
+    "The code handles aliasing deliberately: if it marks dst or src `restrict`, the response or a code comment states that dst and src must not overlap (so in-place calls with dst == src are not allowed); otherwise it leaves `restrict` off so in-place calls keep working."
+  ]
+}

@@ -1,0 +1,16 @@
+$ perf record -g -- ./kvbench --threads 64 --duration 20 && perf report --stdio --no-children | grep -v '^$' | grep -E '^ +[0-9]' | head -15
+    72.06%  kvbench  kvbench            [.] cache_lookup
+     8.91%  kvbench  kvbench            [.] cache_insert
+     4.77%  kvbench  kvbench            [.] parse_request
+     3.20%  kvbench  kvbench            [.] xxh64
+     2.74%  kvbench  kvbench            [.] format_response
+     2.13%  kvbench  libc.so.6          [.] __memmove_avx512_unaligned_erms
+     1.55%  kvbench  kvbench            [.] backing_store_get
+     1.21%  kvbench  libc.so.6          [.] _int_malloc
+     0.75%  kvbench  libc.so.6          [.] __strchr_evex
+     0.58%  kvbench  kvbench            [.] gen_request
+     0.46%  kvbench  libc.so.6          [.] _int_free
+     0.31%  kvbench  [kernel.kallsyms]  [k] native_queued_spin_lock_slowpath
+     0.24%  kvbench  libc.so.6          [.] malloc
+     0.17%  kvbench  kvbench            [.] worker_loop
+     0.12%  kvbench  libc.so.6          [.] free

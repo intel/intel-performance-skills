@@ -1,0 +1,73 @@
+{
+  "expectations": [
+    {
+      "text": "scale.c builds for x86-64 with plain `cc -O2 -fPIC -c` (no extra -m flags) and defines `scale_f32` with the requested signature.",
+      "passed": true,
+      "evidence": "[programmatic] builds with plain -O2 -fPIC"
+    },
+    {
+      "text": "On a CPU without AVX2, scale_f32 sets dst[i] = src[i] * k exactly for every element, for lengths 0 to 100 and several thousand (including lengths that are not a multiple of 8) and for unaligned pointers.",
+      "passed": true,
+      "evidence": "[programmatic] CPU without AVX2: cases=654 fails=0 inplace_mismatches=0"
+    },
+    {
+      "text": "On a CPU with AVX2, scale_f32 gives the same exact results for the same lengths and alignments.",
+      "passed": true,
+      "evidence": "[programmatic] AVX2 CPU: cases=654 fails=0 inplace_mismatches=0"
+    },
+    {
+      "text": "The AVX2 path is selected at runtime from CPU feature detection (e.g. `__builtin_cpu_supports(\"avx2\")`, cpuid, `target_clones` or an ifunc), not only by a compile-time `#ifdef __AVX2__`.",
+      "passed": true,
+      "evidence": "[blind LLM grader] scale.c:113-117 in the first-call resolver runs `__builtin_cpu_init(); if (__builtin_cpu_supports(\"avx2\")) fn = scale_f32_avx2;` and stores the result in scale_f32_impl (line 121). The only compile-time guard is `__GNUC__` plus x86 (line 33); there is no `__AVX2__`."
+    },
+    {
+      "text": "The code handles aliasing deliberately: if it marks dst or src `restrict`, the response or a code comment states that dst and src must not overlap (so in-place calls with dst == src are not allowed); otherwise it leaves `restrict` off so in-place calls keep working.",
+      "passed": true,
+      "evidence": "[blind LLM grader] scale.c has no `restrict`. The comment at scale.c:43-45 says \"No restrict on dst/src: in-place use is expected\". The gap check at lines 58-61 sends calls where dst starts 1..31 bytes after src to the scalar loop, so every overlap matches the plain loop. The response says \"Overlapping buffers are handled; there's no `restrict`.\" The programmatic run shows inplace_mismatches=0 on both paths."
+    }
+  ],
+  "summary": {
+    "passed": 5,
+    "failed": 0,
+    "total": 5,
+    "pass_rate": 1.0
+  },
+  "execution_metrics": {
+    "tool_calls": {
+      "Bash": 32,
+      "Read": 10,
+      "Write": 4,
+      "Edit": 7
+    },
+    "total_tool_calls": 53,
+    "errors_encountered": 0
+  },
+  "timing": {
+    "total_duration_seconds": 6985.1
+  },
+  "user_notes_summary": {
+    "uncertainties": [],
+    "needs_review": [
+      "Saw its own case's grader file names in a directory listing of the skill folder (no file contents)."
+    ],
+    "workarounds": []
+  },
+  "eval_feedback": {
+    "suggestions": [],
+    "overall": "Assertion 05 can't tell apart two different aliasing designs. B gives the plain-loop result for every overlap on both CPUs (the gap check plus in-order load/store per chunk). A supports only exact in-place calls and documents partial overlap as disallowed. For an out-of-contract call such as dst = src + 1, A's AVX2 path (four loads, then four stores) gives different results from its scalar fallback, so the output depends on the CPU. No assertion captures this. Assertion 04 accepts raw cpuid as evidence but doesn't require the OS-support check (CPUID.1 OSXSAVE plus XGETBV/XCR0 bits 1-2). A dispatcher that tests only CPUID leaf 7 EBX bit 5 would pass, yet it would SIGILL where the OS or hypervisor leaves AVX state disabled. A does this check explicitly. B relies on __builtin_cpu_supports, whose runtime does it in current GCC and clang. So it doesn't change these grades."
+  },
+  "skill_files_read": [
+    "performance-patterns",
+    "performance-patterns/SKILL.md",
+    "performance-patterns/guidelines/new-code.md",
+    "performance-patterns/library/cpu-dispatch.md",
+    "performance-patterns/patterns/missing-restrict.md",
+    "performance-patterns/patterns/missing-vzeroupper.md",
+    "performance-patterns/references/known-algorithms.md",
+    "performance-patterns/SKILL.md\\n-",
+    "performance-patterns/guidelines/new-code.md\\n-",
+    "performance-patterns/library/cpu-dispatch.md\\n-",
+    "performance-patterns/patterns/missing-restrict.md\\n-",
+    "performance-patterns/patterns/missing-vzeroupper.md\\n-"
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "eval_name": "startup-config-loader-not-hot",
+  "prompt": "Quick performance review before I merge config.c: anything I should optimize?\n\nInput files: config.c, config.h",
+  "assertions": [
+    "The response concludes that config_load runs once at startup on a small file, so nothing in it is worth optimizing for speed (any suggestions are explicitly framed as optional or negligible).",
+    "The response does not recommend rewriting the weight-normalisation loops with SIMD, multiple accumulators, or similar micro-optimizations (mentioning them only to say they're not worth it is fine).",
+    "The response does not recommend adding performance annotations such as `restrict`, `__attribute__((cold))`/`[[gnu::cold]]`, `__builtin_expect` or prefetching to this startup-only code (mentioning them only to say they're not worth it is fine)."
+  ]
+}

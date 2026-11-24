@@ -1,0 +1,55 @@
+{
+  "expectations": [
+    {
+      "text": "The new implementation builds with plain `cc -O2 -fPIC` for x86-64 and returns exactly what the original crc32c() returns (same seed convention) for random buffers of 0 to 70,000 bytes at unaligned addresses, for chained calls, and for the '123456789' check string (0xE3069283 after the final inversion), with and without AVX available.",
+      "passed": true,
+      "evidence": "[programmatic] CPU without AVX (SSE4.2+PCLMUL): cases=652 fails=0 | throughput_64k_GBps new=36.14 original=0.50 | throughput_4k_GBps new=34.14 original=0.51\nAVX2 CPU (no AVX-512): cases=652 fails=0 | throughput_64k_GBps new=35.77 original=0.51 | throughput_4k_GBps new=34.07 original=0.50"
+    },
+    {
+      "text": "On SSE4.2 CPUs the new implementation uses the hardware CRC32 instruction (`_mm_crc32_u64`/`crc32q`) and/or PCLMULQDQ folding rather than a byte-at-a-time table lookup.",
+      "passed": true,
+      "evidence": "[blind LLM grader] crc32c_fast.c:300-320 crc32c_x86_sse42 uses `_mm_crc32_u64`. CPUs with SSE4.2 and PCLMUL get crc32c_x86_3way (332-384), selected from CPUID ECX bits 20 and 1 (612-645, list at 682-690). The table is only the 'portable' last fallback. measurements.json shows crc32 in every x86 function, and the no-AVX CPU ran at 36.1 GB/s against 0.50 GB/s for the original."
+    },
+    {
+      "text": "The fast path removes the serial dependency of a single CRC chain, e.g. by running several independent CRC streams over different parts of the buffer and combining them, or by folding with PCLMULQDQ, instead of feeding one `_mm_crc32_u64` accumulator 8 bytes at a time.",
+      "passed": true,
+      "evidence": "[blind LLM grader] crc32c_fast.c:343-374 runs three independent crc32q streams (c0/c1/c2) at p, p+klen and p+2*klen, then stitches them into the block's last word with CLMUL_SCALAR (PCLMULQDQ) and chains the next block the same way. This is the Westmere path (x86-sse42-3way). The hybrid kernel (401-477) adds 4 xmm PCLMUL folding accumulators, and the AVX-512 kernel (503-592) uses 8 zmm folding accumulators. Only inputs under 128 bytes use one stream."
+    },
+    {
+      "text": "There is a VPCLMULQDQ/AVX-512 code path that is selected at runtime on CPUs that support it (Ice Lake / Sapphire Rapids).",
+      "passed": true,
+      "evidence": "[blind LLM grader] crc32c_fast.c:503-600 crc32c_x86_avx512 folds 8 zmm accumulators with `_mm512_clmulepi64_epi128`. It is the first entry in crc32c_impls (683-685) and needs CRC32C_HAS_AVX512: leaf 7 EBX bit 16, ECX bit 10 and XCR0&0xe6 (641-642), plus AVX2 and passing the self-test. It is built by default (GCC>=8 / clang>=8; only -DCRC32C_NO_AVX512 removes it). measurements.json shows zmm and pclmul in _crc32c_x86_avx512, and test/avx512_emu.h with the Makefile's test-emu checks the kernel through an emulator."
+    }
+  ],
+  "summary": {
+    "passed": 4,
+    "failed": 0,
+    "total": 4,
+    "pass_rate": 1.0
+  },
+  "execution_metrics": {
+    "tool_calls": {
+      "Bash": 68,
+      "Write": 4,
+      "Edit": 12,
+      "Read": 9
+    },
+    "total_tool_calls": 93,
+    "errors_encountered": 0
+  },
+  "timing": {
+    "total_duration_seconds": 10380.9
+  },
+  "user_notes_summary": {
+    "uncertainties": [],
+    "needs_review": [
+      "Run was cut off by the account's usage limit before it wrote its final reply."
+    ],
+    "workarounds": []
+  },
+  "eval_feedback": {
+    "suggestions": [],
+    "overall": "No assertion covers speed on AVX2-class CPUs (Haswell to Cascade Lake, Zen 1-3), which are probably much of the fleet. On the AVX2 CPU model, A's avx2-pclmul fold+crc32 kernel reached 65.8 GB/s. B stayed at 35.8 GB/s, its no-AVX speed. B's hybrid fold+crc32 kernel only runs when the vendor is GenuineIntel and ADX is reported (crc32c_fast.c:609, 638), so AMD Zen 1-3 can never get it. 04 cannot tell a correct AVX-512 path from a wrong one, and 01 never runs that path because it only tests the no-AVX and AVX2 CPU models. A kernel that exists and is CPUID-gated but returns wrong CRCs would pass both 01 and 04, and would write bad on-disk checksums on Sapphire Rapids. Both attempts here protect against this with an emulated AVX-512 test and a startup self-test, but the eval doesn't require either."
+  },
+  "skill_files_read": []
+}

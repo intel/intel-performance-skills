@@ -1,0 +1,11 @@
+{
+  "eval_name": "rebuild-test-with-debug-info",
+  "prompt": "I want to dig into pts/fluxsim with a profiler (Instruments on this Mac), but the installed binary was built without debug info, so I only see addresses. Can you rebuild it with debug info so that `phoronix-test-suite batch-run pts/fluxsim` (and my profiling) use the rebuilt binary? PTS is a local install here: the CLI is ./bin/phoronix-test-suite and its data directory is ./pts-root (same layout as ~/.phoronix-test-suite).\n\nInput files: bin/, pts-root/",
+  "assertions": [
+    "After the rebuild, the test's entry-point script (pts-root/installed-tests/pts/fluxsim-1.2.0/fluxsim) still exists, unchanged, as the original wrapper script.",
+    "The installed fluxsim-bin was rebuilt with debug info (-g): its debug map lists object files (`nm -ap` shows OSO entries) or a matching .dSYM sits next to it.",
+    "The rebuilt binary keeps the original optimization flags (-O2 from install.sh): it reports a build with -O2 (not -O0) and its throughput is within 20% of a fresh original build.",
+    "`phoronix-test-suite batch-run pts/fluxsim` still completes and reports a result after the rebuild.",
+    "The response tells the user what was rebuilt and how (or where the source now lives), so they can repeat it."
+  ]
+}

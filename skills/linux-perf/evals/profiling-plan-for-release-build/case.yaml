@@ -1,0 +1,7 @@
+schema_version: "1.1"
+name: profiling-plan-for-release-build
+expected_outcome: |
+  A step-by-step plan that checks perf permissions (perf_event_paranoid, with what to do if it is
+  restrictive), adds -g while keeping -O3 (not RelWithDebInfo's -O2), starts with a perf stat
+  counting pass and explains IPC/miss rates, records with a call-graph mode that works without
+  frame pointers, ranks hot functions with perf report, and drills in with perf annotate.

@@ -1,0 +1,63 @@
+{
+  "expectations": [
+    {
+      "text": "The response identifies the loop-carried dependency on `sum` (each addition has to wait for the previous one to finish) as the main bottleneck, rather than memory bandwidth.",
+      "passed": true,
+      "evidence": "[blind LLM grader] response.md:5, the first item under 'What's slow in the original': 'Every add waits for the previous one ... one long chain of dependent adds, so the loop runs at one element per add latency ... however wide the CPU is'. It brings up memory bandwidth only for data coming from DRAM (line 67)."
+    },
+    {
+      "text": "The response warns that the optimized version reorders the floating-point additions, so its results can differ slightly (rounding) from the original loop.",
+      "passed": true,
+      "evidence": "[blind LLM grader] response.md:21 'Results do change in the last bits compared with the old sequential sum; any reordering does that'. Line 6 also says splitting the chain 'reorders float additions, which changes rounding'."
+    },
+    {
+      "text": "dot_fast.c chooses its implementation at runtime from CPU feature detection (`__builtin_cpu_supports`, cpuid, `target_clones` or an ifunc), so one binary uses AVX2 or AVX-512 where available and still runs on CPUs without AVX.",
+      "passed": true,
+      "evidence": "[blind LLM grader] dot_fast.c:152-168 checks CPUID leaf 1 for OSXSAVE and AVX, XGETBV for XCR0&6, and leaf 7 EBX bit 5 for AVX2. dot() (172-184) caches the result and calls dot_avx2 or dot_sse2. There is no AVX-512 path, which is deliberate (response.md:71), but the assertion says 'AVX2 or AVX-512'. The programmatic no-AVX run passed."
+    },
+    {
+      "text": "The widest SIMD path in dot_fast.c keeps at least two independent vector accumulators in its main loop, rather than a single accumulator register.",
+      "passed": true,
+      "evidence": "[blind LLM grader] The widest path, dot_avx2 (dot_fast.c:105-123), declares 4 __m256 accumulators s0..s3, and its main loop (114-123) does a separate mul+add into each."
+    },
+    {
+      "text": "dot_fast.c builds with plain `cc -O2 -fPIC` for x86-64 and, on a CPU without AVX, returns results within 1e-4 relative error of a double-precision reference, including lengths that are not a multiple of the vector width.",
+      "passed": true,
+      "evidence": "[programmatic] CPU without AVX: cases=66 fails=0 worst_relerr=5.73e-08"
+    },
+    {
+      "text": "On a CPU with AVX2 and FMA, dot_fast.c returns results within 1e-4 relative error of a double-precision reference, including lengths that are not a multiple of the vector width.",
+      "passed": true,
+      "evidence": "[programmatic] AVX2+FMA CPU: cases=66 fails=0 worst_relerr=5.73e-08"
+    }
+  ],
+  "summary": {
+    "passed": 6,
+    "failed": 0,
+    "total": 6,
+    "pass_rate": 1.0
+  },
+  "execution_metrics": {
+    "tool_calls": {
+      "Bash": 36,
+      "Write": 4,
+      "Edit": 17,
+      "Read": 2
+    },
+    "total_tool_calls": 59,
+    "errors_encountered": 0
+  },
+  "timing": {
+    "total_duration_seconds": 8177.2
+  },
+  "user_notes_summary": {
+    "uncertainties": [],
+    "needs_review": [],
+    "workarounds": []
+  },
+  "eval_feedback": {
+    "suggestions": [],
+    "overall": "No assertion captures this difference: A uses AVX-512 and FMA and warns that results differ between Westmere and newer boxes. B deliberately leaves out FMA and AVX-512, so every CPU in the fleet returns bit-identical results, and it argues that AVX-512 is not worth it at n of a few thousand. The 'AVX2 or AVX-512' wording of 03 passes both, and nothing checks whether a response deals with results differing across machines, which matters for a library shipped to a mixed fleet. No check executes an AVX-512 path, because Rosetta stops at AVX2. A broken AVX-512 kernel would therefore pass every assertion, and A's 04 is graded on code that nobody has run. From reading it, A's kernel looks correct: a masked tail load ending at a[n-1], and 8 accumulators."
+  },
+  "skill_files_read": []
+}

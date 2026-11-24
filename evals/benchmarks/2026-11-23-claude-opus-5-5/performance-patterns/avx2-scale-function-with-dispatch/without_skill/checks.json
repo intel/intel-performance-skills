@@ -1,0 +1,27 @@
+{
+  "checks": [
+    {
+      "grader": "01-builds-with-plain-flags",
+      "passed": true,
+      "evidence": "builds with plain -O2 -fPIC"
+    },
+    {
+      "grader": "02-correct-without-avx2",
+      "passed": true,
+      "evidence": "CPU without AVX2: cases=654 fails=0 inplace_mismatches=0"
+    },
+    {
+      "grader": "03-correct-with-avx2",
+      "passed": true,
+      "evidence": "AVX2 CPU: cases=654 fails=0 inplace_mismatches=0"
+    }
+  ],
+  "info": {
+    "functions_using_wide_regs": {
+      "_scale_f32_avx2": [
+        "vzeroupper",
+        "ymm"
+      ]
+    }
+  }
+}

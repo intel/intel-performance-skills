@@ -1,0 +1,35 @@
+{
+  "checks": [
+    {
+      "grader": "01-entry-script-intact",
+      "passed": true,
+      "evidence": "entry-point script is byte-identical to the one install.sh creates"
+    },
+    {
+      "grader": "02-binary-has-debug-info",
+      "passed": true,
+      "evidence": "debug map present (1 OSO entries, e.g. $TMPDIR/fluxsim-b1bf1a.o); dSYM bundle next to the binary: fluxsim-bin.dSYM"
+    },
+    {
+      "grader": "03-optimization-unchanged",
+      "passed": true,
+      "evidence": "rebuilt binary reports build flags '-O2 -g -fdebug-prefix-map=<work>/pts-root/installed-tests/pts/fluxsim-1.2.0/fluxsim=<work>/pts-root/installed-tests/pts/fluxsim-1.2.0/fluxsim-src -dsym-dir <work>/pts-root/installed-tests/pts/fluxsim-1.2.0'; throughput 567.96 vs fresh -O2 build 573.15 MCells/s (ratio 0.99)"
+    },
+    {
+      "grader": "04-batch-run-works",
+      "passed": true,
+      "evidence": "batch-run reported 588.06 MCells/s"
+    }
+  ],
+  "info": {
+    "changed_files": [
+      "+ installed-tests/pts/fluxsim-1.2.0/fluxsim-bin.dSYM/Contents/Info.plist",
+      "+ installed-tests/pts/fluxsim-1.2.0/fluxsim-bin.dSYM/Contents/Resources/DWARF/fluxsim-bin",
+      "+ installed-tests/pts/fluxsim-1.2.0/fluxsim-bin.dSYM/Contents/Resources/Relocations/aarch64/fluxsim-bin.yml",
+      "+ installed-tests/pts/fluxsim-1.2.0/fluxsim-src/Makefile",
+      "+ installed-tests/pts/fluxsim-1.2.0/fluxsim-src/README",
+      "+ installed-tests/pts/fluxsim-1.2.0/fluxsim-src/fluxsim.c",
+      "M installed-tests/pts/fluxsim-1.2.0/fluxsim-bin (rebuilt)"
+    ]
+  }
+}

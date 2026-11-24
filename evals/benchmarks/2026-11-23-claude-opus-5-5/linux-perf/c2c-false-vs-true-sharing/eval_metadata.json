@@ -1,0 +1,13 @@
+{
+  "eval_name": "c2c-false-vs-true-sharing",
+  "prompt": "My server gets slower as I add threads. Can you use perf c2c to find false sharing? I ran `perf c2c record -g -- ./pktsrv --threads 32 --duration 30` and then `perf c2c report --full-symbols --stdio --double-cl > c2c_report.txt` on the box (32 worker threads on a 56-core Xeon). The report and the source are attached; tell me what's going on and what to change.\n\nInput files: c2c_report.txt, pktsrv.c, stats.h",
+  "assertions": [
+    "The response identifies g_wstats (the per-worker `struct worker_stats` array, the four ~13-15% lines) as false sharing: each worker writes its own element, but the 16-byte elements of 8 workers sit on the same 128-byte line at different offsets.",
+    "The response identifies `g_state.inflight` (offset 0x0 of the 33.8% line, written by all 32 workers) as true sharing, and says padding or alignment alone won't fix it.",
+    "The response notices that the read-mostly `shutting_down` flag (offset 0x10, read in every worker's loop condition) shares that cache line with the constantly written `inflight` counter, and recommends moving it to a separate cache line.",
+    "The response recommends giving each worker's stats their own cache line (e.g. `alignas(64)` or padding `struct worker_stats` to 64 bytes or more, or per-thread allocation), with code.",
+    "The response recommends taking the shared atomic `inflight` counter off the per-packet path (e.g. per-worker counters that the monitor sums, batching, or dropping it), rather than only padding it.",
+    "The response treats the remaining lines (each 3.1% of HITMs or less, e.g. the ring buffers and malloc's main_arena) as minor and doesn't recommend changes for them.",
+    "The response suggests re-running perf c2c and/or the thread-scaling benchmark after the change to confirm that the HITMs on these lines drop."
+  ]
+}
