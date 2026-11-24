@@ -1,0 +1,10 @@
+{
+  "eval_name": "crc32c-table-lookup-rewrite",
+  "prompt": "crc32c() in crc32c.c is about 25% of CPU in our storage engine: we checksum every 4 KiB page and 64 KiB WAL block. The checksums are stored on disk, so the function must keep returning exactly the same values, and it has to run on every x86-64 server in our fleet, from 2010-era Westmere boxes (SSE4.2 and PCLMUL, no AVX) up to Sapphire Rapids. Make it as fast as you reasonably can. Keep the function signature and put the new implementation in crc32c_fast.c (add more .c files if you need them). Our build compiles every file with plain `cc -O2 -fPIC`.\n\nInput files: crc32c.c",
+  "assertions": [
+    "The new implementation builds with plain `cc -O2 -fPIC` for x86-64 and returns exactly what the original crc32c() returns (same seed convention) for random buffers of 0 to 70,000 bytes at unaligned addresses, for chained calls, and for the '123456789' check string (0xE3069283 after the final inversion), with and without AVX available.",
+    "On SSE4.2 CPUs the new implementation uses the hardware CRC32 instruction (`_mm_crc32_u64`/`crc32q`) and/or PCLMULQDQ folding rather than a byte-at-a-time table lookup.",
+    "The fast path removes the serial dependency of a single CRC chain, e.g. by running several independent CRC streams over different parts of the buffer and combining them, or by folding with PCLMULQDQ, instead of feeding one `_mm_crc32_u64` accumulator 8 bytes at a time.",
+    "There is a VPCLMULQDQ/AVX-512 code path that is selected at runtime on CPUs that support it (Ice Lake / Sapphire Rapids)."
+  ]
+}

@@ -1,0 +1,475 @@
+{
+  "metadata": {
+    "skill_name": "linux-perf",
+    "skill_path": "skills/linux-perf",
+    "executor_model": "claude-opus-5-5",
+    "analyzer_model": "claude-opus-5-5",
+    "timestamp": "2026-11-24T04:19:24Z",
+    "evals_run": [
+      "c2c-false-vs-true-sharing",
+      "low-ipc-serial-fma-loop",
+      "profiling-plan-for-release-build",
+      "spinlock-scaling-collapse"
+    ],
+    "runs_per_configuration": 1
+  },
+  "runs": [
+    {
+      "eval_id": "c2c-false-vs-true-sharing",
+      "eval_name": "c2c-false-vs-true-sharing",
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 7,
+        "failed": 0,
+        "total": 7,
+        "time_seconds": 6594.1,
+        "tokens": 187402,
+        "tool_calls": 36,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "The response identifies g_wstats (the per-worker `struct worker_stats` array, the four ~13-15% lines) as false sharing: each worker writes its own element, but the 16-byte elements of 8 workers sit on the same 128-byte line at different offsets.",
+          "passed": true,
+          "evidence": "[blind LLM grader] response.md:5-7 'g_wstats[]: false sharing, 54.5% of HITMs ... struct worker_stats is 16 bytes, so 4 workers share every 64-byte cache line and 8 share every 128-byte pair. Each worker only writes its own entry'; :24 lists the four lines (14.62+13.95+13.20+12.77%) as g_wstats[0..31], 8 workers per 128 B; :58 '16 different offsets, and each one is written by a single CPU ... false sharing'."
+        },
+        {
+          "text": "The response identifies `g_state.inflight` (offset 0x0 of the 33.8% line, written by all 32 workers) as true sharing, and says padding or alignment alone won't fix it.",
+          "passed": true,
+          "evidence": "[blind LLM grader] response.md:9 'inflight (true sharing, 26.5%): all 32 workers do a lock inc and a lock dec on the single g_state.inflight counter'; :114 '+0x00 is true sharing. All 32 CPUs write the same offset ... Padding can't help here'; :14 'Padding ... cannot fix inflight'."
+        },
+        {
+          "text": "The response notices that the read-mostly `shutting_down` flag (offset 0x10, read in every worker's loop condition) shares that cache line with the constantly written `inflight` counter, and recommends moving it to a separate cache line.",
+          "passed": true,
+          "evidence": "[blind LLM grader] response.md:10 'shutting_down ... polled on every loop iteration and never written during the run. It sits 16 bytes from inflight on the same line'; :166-177 'Put shutting_down in a read-mostly block' with _Alignas(128) and total_conns in a separate block; implemented in files/stats.h:39-51."
+        },
+        {
+          "text": "The response recommends giving each worker's stats their own cache line (e.g. `alignas(64)` or padding `struct worker_stats` to 64 bytes or more, or per-thread allocation), with code.",
+          "passed": true,
+          "evidence": "[blind LLM grader] response.md:123-141 shows code: struct worker_stats with _Alignas(PKTSRV_CL_PAIR) (128) and _Static_assert(sizeof == 128), explaining 128 vs 64; implemented in files/stats.h:25-34."
+        },
+        {
+          "text": "The response recommends taking the shared atomic `inflight` counter off the per-packet path (e.g. per-worker counters that the monitor sums, batching, or dropping it), rather than only padding it.",
+          "passed": true,
+          "evidence": "[blind LLM grader] response.md:143-162 replaces the global inflight with a per-worker 'busy' flag the monitor sums ('If nobody actually looks at the inflight number, you can simply delete it'); files/pktsrv.c removes both atomic_fetch_add/sub on g_state.inflight and uses relaxed stores to ws->busy, which the monitor sums."
+        },
+        {
+          "text": "The response treats the remaining lines (each 3.1% of HITMs or less, e.g. the ring buffers and malloc's main_arena) as minor and doesn't recommend changes for them.",
+          "passed": true,
+          "evidence": "[blind LLM grader] response.md:200 'Below the 5% threshold (not the cause of your scaling problem)'; rings are 'the unavoidable handoff in a single-producer, single-consumer ring'; malloc 'You can ignore it for now'. 'What to change' covers only the three major issues; the one ring idea is explicitly optional ('If you want to trim this later: ... batched pops'), and no ring or malloc code was changed."
+        },
+        {
+          "text": "The response suggests re-running perf c2c and/or the thread-scaling benchmark after the change to confirm that the HITMs on these lines drop.",
+          "passed": true,
+          "evidence": "[blind LLM grader] response.md:185-196 'How to confirm the fix on the Xeon': rerun perf c2c record/report, expect the g_state and g_wstats entries to drop out of the table (<1% each), and run --threads 1, 4, 8, 16, 32 to check that pkts/s scales."
+        }
+      ],
+      "notes": [
+        "Saw its own case's grader file names in a directory listing of the skill folder (no file contents)."
+      ]
+    },
+    {
+      "eval_id": "low-ipc-serial-fma-loop",
+      "eval_name": "low-ipc-serial-fma-loop",
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 6,
+        "failed": 0,
+        "total": 6,
+        "time_seconds": 6689.2,
+        "tokens": 229012,
+        "tool_calls": 43,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "The response explains that the loop is latency-bound on the single accumulator `s`: each vfmadd231sd has to wait for the previous one (about 4 cycles), and it cites the annotate evidence (the FMA into %xmm0 carrying ~90% of the samples).",
+          "passed": true,
+          "evidence": "[blind LLM grader] response.md:5 '`s` is the only accumulator, so each iteration's FMA has to wait for the previous iteration's result'; :11 quotes the annotate line 'vfmadd231sd %xmm1,%xmm1,%xmm0 <- 90% of samples: xmm0 += r*r, needs last iteration's xmm0'; :16 'An FMA takes 4 cycles ... at most one element every 4 cycles'; :24 derives 3.9 cycles/element from the counters."
+        },
+        {
+          "text": "The response notes that the hot loop is scalar double precision (`sd` instructions on xmm registers) even though the CPU supports AVX2/AVX-512, i.e. the loop isn't vectorized.",
+          "passed": true,
+          "evidence": "[blind LLM grader] response.md:37 pattern table row 'Scalar FP on an AVX-512 CPU | Only scalar `sd` ops (one double each); the CPU has avx512f/dq/bw/vl and two 512-bit FMA units'; :39 'one FMA every 4 cycles, while the core can do 16 double-precision FMAs per cycle'; :42 quotes Clang's 'loop not vectorized'."
+        },
+        {
+          "text": "The response explains that the compiler won't reassociate or vectorize this floating-point reduction at -O2 unless allowed to (e.g. -ffast-math/-fassociative-math, `#pragma omp simd reduction`, or a manual rewrite).",
+          "passed": true,
+          "evidence": "[blind LLM grader] response.md:41-44 'changes the order of the floating-point additions. That changes rounding, so the compiler isn't allowed to do it on its own'; Clang at -O2 unrolls x8 but keeps one chain; GCC 'vectorizes only with -fassociative-math/-ffast-math or #pragma omp simd reduction(+:s)'."
+        },
+        {
+          "text": "The proposed fix breaks the dependency chain with multiple independent accumulators and/or SIMD vector accumulators, and shows the code.",
+          "passed": true,
+          "evidence": "[blind LLM grader] response.md:50-63 shows the AVX-512 loop with four independent zmm accumulators a0..a3 ('four independent chains'). files/residuals.c:34-127 implements AVX-512 (4 zmm), AVX2+FMA (4 ymm) and portable C (4 scalar) accumulator versions with runtime dispatch, plus correct tails and a final reduction."
+        },
+        {
+          "text": "The response warns that reordering the additions can change the result slightly (rounding), so it won't be bit-identical to the serial loop.",
+          "passed": true,
+          "evidence": "[blind LLM grader] response.md:78-90 'Results will differ from the old serial loop by rounding in the last few bits' and 'The results are not bit-identical, though': golden tests need a tolerance, and AVX-512 and AVX2 machines will differ from each other."
+        },
+        {
+          "text": "The response says how to confirm the fix with perf, e.g. re-running perf stat to compare IPC/cycles or counting packed vs scalar FP instructions (fp_arith_inst_retired.*).",
+          "passed": true,
+          "evidence": "[blind LLM grader] response.md:92-107 gives 'perf stat -e task-clock,cycles,instructions' and 'perf stat -e fp_arith_inst_retired.scalar_double,...256b_packed_double,...512b_packed_double', plus perf annotate of sse_avx512, with expected results ('Cycles: down roughly 8-15x', 'scalar_double falls ... to near 0')."
+        }
+      ],
+      "notes": [
+        "Saw its own case's grader file names in a directory listing of the skill folder (no file contents)."
+      ]
+    },
+    {
+      "eval_id": "profiling-plan-for-release-build",
+      "eval_name": "profiling-plan-for-release-build",
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 5,
+        "failed": 0,
+        "total": 5,
+        "time_seconds": 6995.7,
+        "tokens": 241429,
+        "tool_calls": 24,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "The plan adds debug info without changing the optimization level being profiled: it keeps -O3 (e.g. adds -g to CMAKE_CXX_FLAGS or CMAKE_CXX_FLAGS_RELEASE) and does not switch to RelWithDebInfo or -O2, or, if it mentions RelWithDebInfo, it warns that this changes -O3 to -O2.",
+          "passed": true,
+          "evidence": "[blind LLM grader] response.md:40-41 runs 'cmake ... -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS=\"-g\"'. :45 says the lines become '-g -O3 -DNDEBUG', and :49 says 'Don't use RelWithDebInfo for this. It is -O2 -g, so you would be profiling a different binary.' The fallback at :65 correctly keeps the full value: -DCMAKE_CXX_FLAGS_RELEASE=\"-O3 -DNDEBUG -g\"."
+        },
+        {
+          "text": "The plan includes a step to check perf_event_paranoid (or otherwise check perf permissions) before collecting, and says what to do if it's too restrictive (run with sudo or lower the setting).",
+          "passed": true,
+          "evidence": "[blind LLM grader] response.md:21-22 saves 'sysctl kernel.perf_event_paranoid kernel.kptr_restrict' and runs 'sudo sysctl -w kernel.perf_event_paranoid=1 ...'. :31-33 explain that Ubuntu sets it above 2 (usually 4), which blocks non-root perf, and that 1 allows profiling your own processes. It also says 'If you'd rather not change sysctls, put sudo in front of every perf command'. There is a counter smoke test (:23), and step 7 restores the setting."
+        },
+        {
+          "text": "The plan includes a perf stat counting pass (cycles, instructions, cache and branch events) and explains how to read IPC and the miss rates from it.",
+          "passed": true,
+          "evidence": "[blind LLM grader] response.md:72 runs 'perf stat -e ...,cycles,instructions,branches,branch-misses,cache-references,cache-misses'. The table at :85-87 explains IPC thresholds (<1 stalled, 1-2.5 typical, >3 efficient), the branch-miss % (>3-5%), and the LLC cache-miss ratio plus misses per 1000 instructions (cache-misses / instructions x 1000; <1 low, >10 heavy)."
+        },
+        {
+          "text": "The plan includes perf record with call-graph collection that works on an -O3 build without frame pointers (`--call-graph dwarf` or `lbr`, or rebuilding with -fno-omit-frame-pointer) and perf report to rank the hot functions.",
+          "passed": true,
+          "evidence": "[blind LLM grader] response.md:99 runs 'perf record -F 499 --call-graph dwarf ...'. :102 explains that -O3 drops frame pointers, so -g/fp stacks would be broken, and :104 names lbr as an option. perf report ranks the functions: self list '--no-children -g none --sort dso,sym' (:117, described as 'the hotspot list' at :128), plus inclusive and callers reports."
+        },
+        {
+          "text": "The plan includes perf annotate (or perf report's annotate view) to drill into the hottest functions at the source-line or instruction level.",
+          "passed": true,
+          "evidence": "[blind LLM grader] Step 6 (:164-167) runs 'perf annotate -i prof/perf-cpu.data --stdio -l -s <exact symbol>' for each function at 20% or more (top 3-5), with the perf report 'a' alternative at :170. :172-180 explain reading the sorted source-line summary and hot instructions (loads, div, lock cmpxchg/xadd, scalar vs SIMD, calls in the loop)."
+        }
+      ],
+      "notes": [
+        "Saw its own case's grader file names in a directory listing of the skill folder (no file contents)."
+      ]
+    },
+    {
+      "eval_id": "spinlock-scaling-collapse",
+      "eval_name": "spinlock-scaling-collapse",
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 6,
+        "failed": 0,
+        "total": 6,
+        "time_seconds": 6804.5,
+        "tokens": 253145,
+        "tool_calls": 36,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "The response identifies the spin lock in cache_lookup as the bottleneck that grows with thread count, citing that cache_lookup goes from ~30% of cycles at 1 thread to ~72% at 64 and that most of its samples sit on `lock cmpxchg` and `pause`.",
+          "passed": true,
+          "evidence": "[blind LLM grader] 'The bottleneck is the single global spinlock'. Dual-profile table: cache_lookup 72.06% at 64T vs 29.84% at 1T. Annotate scan: '`lock cmpxchg %ecx,(%rdi)` 68.93% + `pause` 11.87% ... ≈ 59% of all cycles'."
+        },
+        {
+          "text": "The response explains that the test-and-set loop does an atomic `lock cmpxchg` on every spin iteration, so every waiting thread keeps pulling the lock's cache line into exclusive state, which is why throughput falls at 64 threads.",
+          "passed": true,
+          "evidence": "[blind LLM grader] response.md:8 'a test-and-set spinlock ... Each waiter retries `lock cmpxchg`, which takes the line exclusively even when it fails ... 63 spinning threads keep pulling away the line the lock holder needs ... every handoff gets slower as waiters are added' ('That is the drop at 64'). :138 'Every failed `lock cmpxchg` is a read-for-ownership'. B also adds cross-socket traffic as a further factor."
+        },
+        {
+          "text": "The response recommends making waiters spin on a plain read of the lock before retrying the atomic (test-and-test-and-set), or replacing the spinlock with a lock that doesn't hammer the line (a queued/MCS or ticket lock, or a futex-based mutex).",
+          "passed": true,
+          "evidence": "[blind LLM grader] Proposes TTAS: CAS once, then 'while (__atomic_load_n(l, __ATOMIC_RELAXED)) _mm_pause();' so 'Waiters spin on a shared copy'. Implemented in files/proposed_fix/lru_cache_ttas.c:40-45 and in sharded.c:61-66. Also mentions an MCS or ticket queue lock."
+        },
+        {
+          "text": "The response points out, from the c2c offsets, that the lock word shares a cache line with fields written inside the critical section (hits, lru_head/lru_tail) and recommends separating them.",
+          "passed": true,
+          "evidence": "[blind LLM grader] Its c2c table maps 0x00 lock, 0x08 hits, 0x18 lru_head and 0x20 lru_tail onto the struct cache line: 'the lock and its data are sitting together. The fix is to give the lock its own line'. Both files do this: lru_cache_ttas.c:30-31 has lock alone, then '_Alignas(128) uint32_t nentries' at +0x80; lru_cache_sharded.c:41-42 does the same per shard."
+        },
+        {
+          "text": "The response explains that one lock around every lookup will still cap scaling after the spin fix, and recommends reducing serialization, e.g. sharding the cache into independently locked segments or avoiding the per-hit LRU and statistics writes.",
+          "passed": true,
+          "evidence": "[blind LLM grader] 'Fixing the spin (TTAS, lock on its own line) should stop the collapse, but it cannot go above about 14.5M ops/s. To scale, shard the cache so threads stop sharing one lock and one LRU list.' Provides a 256-shard lru_cache_sharded.c and suggests promoting less often or CLOCK."
+        },
+        {
+          "text": "The response does not recommend just switching cache_lookup to a reader-writer lock without dealing with the fact that every hit writes shared state (LRU move-to-front, hits++), which a read lock doesn't allow.",
+          "passed": true,
+          "evidence": "[blind LLM grader] 'Not recommended: pthread_rwlock ... A lookup is a write. cache_lookup writes on every hit (hits++, lru_unlink, lru_push_front). Under a read lock that corrupts the list'."
+        }
+      ],
+      "notes": [
+        "Saw its own case's grader file names in a directory listing of the skill folder (no file contents)."
+      ]
+    },
+    {
+      "eval_id": "c2c-false-vs-true-sharing",
+      "eval_name": "c2c-false-vs-true-sharing",
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 0.8571,
+        "passed": 6,
+        "failed": 1,
+        "total": 7,
+        "time_seconds": 6621.2,
+        "tokens": 156986,
+        "tool_calls": 25,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "The response identifies g_wstats (the per-worker `struct worker_stats` array, the four ~13-15% lines) as false sharing: each worker writes its own element, but the 16-byte elements of 8 workers sit on the same 128-byte line at different offsets.",
+          "passed": true,
+          "evidence": "[blind LLM grader] response.md:7 '#1-#4 (...d200-...d380) | g_wstats[0..31]: rx_packets at 0x0, 0x10, ... rx_bytes at 0x8, 0x18 ... Each offset is touched by only 1-2 CPUs | 54.5% | False sharing'; :14 'Each worker writes only its own slot, but struct worker_stats is 16 bytes, so 4 workers share every 64-byte line'; :19 'up to 3 neighbouring workers, or 7 counting the adjacent-line pair' (8 per 128-byte pair)."
+        },
+        {
+          "text": "The response identifies `g_state.inflight` (offset 0x0 of the 33.8% line, written by all 32 workers) as true sharing, and says padding or alignment alone won't fix it.",
+          "passed": true,
+          "evidence": "[blind LLM grader] response.md:8 '#0 (...d100), offset 0x0 | g_state.inflight: atomic_fetch_add/atomic_fetch_sub ... from 32 CPUs | True sharing (a contended atomic)'; :15 'Padding does nothing for this; the only fix is to stop sharing the counter'; :3 'padding can't fix that'."
+        },
+        {
+          "text": "The response notices that the read-mostly `shutting_down` flag (offset 0x10, read in every worker's loop condition) shares that cache line with the constantly written `inflight` counter, and recommends moving it to a separate cache line.",
+          "passed": true,
+          "evidence": "[blind LLM grader] response.md:9 '#0, offset 0x10 | g_state.shutting_down, read on every loop iteration (:51), on the same line as inflight | False sharing'; :29 'g_state is split. shutting_down and log_level (both read-mostly) share one 128-byte block'; diff at :43 puts _Alignas(128) on shutting_down; :82 'Moving shutting_down off the counter's line doubles it again'. Implemented in files/stats.h:33-39."
+        },
+        {
+          "text": "The response recommends giving each worker's stats their own cache line (e.g. `alignas(64)` or padding `struct worker_stats` to 64 bytes or more, or per-thread allocation), with code.",
+          "passed": true,
+          "evidence": "[blind LLM grader] response.md:27 'struct worker_stats is now _Alignas(128). Each worker owns a whole 128-byte block'; the diff at :31-38 shows the code; files/stats.h:21-27 has _Alignas(PKTSRV_DESTRUCTIVE_SIZE) plus a _Static_assert on the alignment."
+        },
+        {
+          "text": "The response recommends taking the shared atomic `inflight` counter off the per-packet path (e.g. per-worker counters that the monitor sums, batching, or dropping it), rather than only padding it.",
+          "passed": true,
+          "evidence": "[blind LLM grader] response.md:28 'The global inflight is gone. It is now a per-worker 0/1 field in the same block, and the monitor adds them up'; the diff at :48-60 and files/pktsrv.c replace atomic_fetch_add/sub with relaxed stores to ws->inflight, which the monitor sums."
+        },
+        {
+          "text": "The response treats the remaining lines (each 3.1% of HITMs or less, e.g. the ring buffers and malloc's main_arena) as minor and doesn't recommend changes for them.",
+          "passed": false,
+          "evidence": "[blind LLM grader] response.md:87 'Still left: the rings (~10%; not changed because ring.c wasn't attached)', followed by three recommended ring changes: 'Cache the other side's index', 'Pop and push in bursts', 'Move the two indices 128 bytes apart'. It treats the rings as a ~10% item it would have fixed, not as minor lines to leave alone. Only malloc is deprioritized ('not worth chasing until the rest is fixed')."
+        },
+        {
+          "text": "The response suggests re-running perf c2c and/or the thread-scaling benchmark after the change to confirm that the HITMs on these lines drop.",
+          "passed": true,
+          "evidence": "[blind LLM grader] response.md:100-103 'Re-run c2c. Rebuild, then repeat the same perf c2c record -g ... Lines #0-#4 should disappear' and 'Run --threads 1/2/4/8/16/32 before and after and compare the monitor's pkts/s'."
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": "low-ipc-serial-fma-loop",
+      "eval_name": "low-ipc-serial-fma-loop",
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 0.8333,
+        "passed": 5,
+        "failed": 1,
+        "total": 6,
+        "time_seconds": 7236.0,
+        "tokens": 231206,
+        "tool_calls": 72,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "The response explains that the loop is latency-bound on the single accumulator `s`: each vfmadd231sd has to wait for the previous one (about 4 cycles), and it cites the annotate evidence (the FMA into %xmm0 carrying ~90% of the samples).",
+          "passed": true,
+          "evidence": "[blind LLM grader] response.md:1 '`s += r*r` makes every iteration depend on the one before ... one element per FMA latency, which is 4 cycles on Sapphire Rapids'; :12 quotes the annotate line 'vfmadd231sd %xmm1,%xmm1,%xmm0 # s = r*r + s needs the previous s <- 90% of samples'; :15 'xmm0 holds s ... each FMA has to wait 4 cycles for the previous one'; :18 gives 3.9 cycles/element."
+        },
+        {
+          "text": "The response notes that the hot loop is scalar double precision (`sd` instructions on xmm registers) even though the CPU supports AVX2/AVX-512, i.e. the loop isn't vectorized.",
+          "passed": false,
+          "evidence": "[blind LLM grader] The reply never says the hot loop is scalar. It shows the vmovsd/vsubsd/vfmadd231sd lines (:10-12) without saying that `sd` means scalar double, and the diagnosis never contrasts the loop with the CPU's AVX2/AVX-512 width. The only hint is in the compiler-limit paragraph (:28): the compiler is 'not allowed to split s into partial sums or vectorize the reduction'. AVX-512 comes up only at :86, as a design choice for the fix."
+        },
+        {
+          "text": "The response explains that the compiler won't reassociate or vectorize this floating-point reduction at -O2 unless allowed to (e.g. -ffast-math/-fassociative-math, `#pragma omp simd reduction`, or a manual rewrite).",
+          "passed": true,
+          "evidence": "[blind LLM grader] response.md:28 'floating-point addition isn't associative. Without -ffast-math (or -fassociative-math), neither GCC nor Clang is allowed to split s into partial sums or vectorize the reduction. Clang at -O2 unrolls the loop by 8, but it is still one chain'; :84 covers '#pragma omp simd reduction(+:s)' with -fopenmp-simd."
+        },
+        {
+          "text": "The proposed fix breaks the dependency chain with multiple independent accumulators and/or SIMD vector accumulators, and shows the code.",
+          "passed": true,
+          "evidence": "[blind LLM grader] response.md:36-44 shows the loop with four independent vector accumulators a0..a3 (GCC vector extensions, 4-wide ymm under __AVX__). files/residuals.c:44-70 implements it with a horizontal sum and a scalar tail, and :34 notes it produces 4 independent vfmadd231pd chains."
+        },
+        {
+          "text": "The response warns that reordering the additions can change the result slightly (rounding), so it won't be bit-identical to the serial loop.",
+          "passed": true,
+          "evidence": "[blind LLM grader] response.md:59 'the result is no longer bit-identical to the old loop, because the summation order changed ... If anything compares these sums bit-for-bit against old values, re-baseline it.'"
+        },
+        {
+          "text": "The response says how to confirm the fix with perf, e.g. re-running perf stat to compare IPC/cycles or counting packed vs scalar FP instructions (fp_arith_inst_retired.*).",
+          "passed": true,
+          "evidence": "[blind LLM grader] response.md:88-95 'To confirm on the box': 'perf stat -e cycles,instructions ./fitbench --points 100000 --iters 200000' and 'In perf annotate, the samples should now spread across the loads and vsubpd instead of piling onto one FMA'. :53-57 gives the expected 7-12x and 'Judge the result by time or cycles per element, not IPC'."
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": "profiling-plan-for-release-build",
+      "eval_name": "profiling-plan-for-release-build",
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 0.8,
+        "passed": 4,
+        "failed": 1,
+        "total": 5,
+        "time_seconds": 7105.3,
+        "tokens": 214608,
+        "tool_calls": 40,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "The plan adds debug info without changing the optimization level being profiled: it keeps -O3 (e.g. adds -g to CMAKE_CXX_FLAGS or CMAKE_CXX_FLAGS_RELEASE) and does not switch to RelWithDebInfo or -O2, or, if it mentions RelWithDebInfo, it warns that this changes -O3 to -O2.",
+          "passed": true,
+          "evidence": "[blind LLM grader] response.md:53-55 builds build-prof with -DCMAKE_BUILD_TYPE=Release and -DCMAKE_CXX_FLAGS=\"-g -fno-omit-frame-pointer -mno-omit-leaf-frame-pointer\"; :60 says the compile line must contain '... -O3 -DNDEBUG'; :63 'Why not RelWithDebInfo: it uses -O2, so you'd be profiling a different binary.' The extra frame-pointer flags are not an optimization-level change, and step 2 times both builds against each other."
+        },
+        {
+          "text": "The plan includes a step to check perf_event_paranoid (or otherwise check perf permissions) before collecting, and says what to do if it's too restrictive (run with sudo or lower the setting).",
+          "passed": true,
+          "evidence": "[blind LLM grader] response.md:33-36 reads 'sysctl kernel.perf_event_paranoid kernel.kptr_restrict | tee prof/00-sysctl-before.txt', then 'sudo sysctl -w kernel.perf_event_paranoid=-1 ...' with 'Ubuntu restricts perf for normal users. This lifts the restriction'. It also has a counter smoke test (:43) and restores the setting in step 9."
+        },
+        {
+          "text": "The plan includes a perf stat counting pass (cycles, instructions, cache and branch events) and explains how to read IPC and the miss rates from it.",
+          "passed": false,
+          "evidence": "[blind LLM grader] response.md:70-71 runs a plain 'perf stat' with the default events (cycles, instructions, branches, branch-misses) and no cache events. The validation log confirms the default list has no cache counters. :85 explains IPC and :86 only says 'branch-misses of several %: note it'. No cache-references/cache-misses are collected and no cache miss rate is explained anywhere. Memory-boundness is left to Top-down in step 8 (:237-243), which is not cache events or miss rates."
+        },
+        {
+          "text": "The plan includes perf record with call-graph collection that works on an -O3 build without frame pointers (`--call-graph dwarf` or `lbr`, or rebuilding with -fno-omit-frame-pointer) and perf report to rank the hot functions.",
+          "passed": true,
+          "evidence": "[blind LLM grader] Rebuilds with -fno-omit-frame-pointer -mno-omit-leaf-frame-pointer (:53) and records with 'perf record -F 999 --call-graph fp' (:106). It ranks hot functions with perf report self/inclusive/callers (:118-155, e.g. '--no-children --sort dso,symbol -g none --percent-limit 0.5'). The fallbacks use '--call-graph lbr' (:265) and '--call-graph dwarf' (:274)."
+        },
+        {
+          "text": "The plan includes perf annotate (or perf report's annotate view) to drill into the hottest functions at the source-line or instruction level.",
+          "passed": true,
+          "evidence": "[blind LLM grader] Step 5f (:170) runs 'perf annotate -i prof/perf.data --stdio --dsos ingest --percent-limit 5' on the top functions, with source lines interleaved. :174-177 explain instruction-level reading (loads after pointer chasing, lock-prefixed instructions, div, skid), and :178 gives the perf report 'a' annotate alternative."
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": "spinlock-scaling-collapse",
+      "eval_name": "spinlock-scaling-collapse",
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 0.8333,
+        "passed": 5,
+        "failed": 1,
+        "total": 6,
+        "time_seconds": 2149.4,
+        "tokens": 258067,
+        "tool_calls": 46,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "The response identifies the spin lock in cache_lookup as the bottleneck that grows with thread count, citing that cache_lookup goes from ~30% of cycles at 1 thread to ~72% at 64 and that most of its samples sit on `lock cmpxchg` and `pause`.",
+          "passed": true,
+          "evidence": "[blind LLM grader] Title names the one global spinlock c->lock as the bottleneck; section 2: 'cache_lookup grows from 29.8% to 72.1%' and '68.9% of cache_lookup is on `lock cmpxchg` and 11.9% on `pause`', with ~59% of all 64T cycles spent waiting on c->lock."
+        },
+        {
+          "text": "The response explains that the test-and-set loop does an atomic `lock cmpxchg` on every spin iteration, so every waiting thread keeps pulling the lock's cache line into exclusive state, which is why throughput falls at 64 threads.",
+          "passed": true,
+          "evidence": "[blind LLM grader] response.md:9 'threads waiting on the lock keep executing `lock cmpxchg`, and each attempt pulls that line away from the thread holding the lock'; :46 'A failed `lock cmpxchg` still takes the line exclusive'; :47-49 '63 spinners keep demanding the line the holder needs ... More waiters means longer critical sections, which means lower throughput'. :28 calls it a test-and-set lock."
+        },
+        {
+          "text": "The response recommends making waiters spin on a plain read of the lock before retrying the atomic (test-and-test-and-set), or replacing the spinlock with a lock that doesn't hammer the line (a queued/MCS or ticket lock, or a futex-based mutex).",
+          "passed": true,
+          "evidence": "[blind LLM grader] Section 4 fix: 'TTAS spin (test-and-test-and-set): waiters read the lock until it looks free, then CAS. On x86 this keeps waiters on a shared copy instead of issuing failing ownership requests (RFOs)'. files/lru_cache_sharded.c:84-91 implements it (LOCK_TTAS=1 by default). A says TTAS alone doesn't raise the ceiling, but it is still part of the recommended fix."
+        },
+        {
+          "text": "The response points out, from the c2c offsets, that the lock word shares a cache line with fields written inside the critical section (hits, lru_head/lru_tail) and recommends separating them.",
+          "passed": false,
+          "evidence": "[blind LLM grader] A does the diagnosis half: its c2c offset table maps 0x0 lock, 0x8 hits, 0x18 lru_head and 0x20 lru_tail onto one line. It never recommends moving the lock away from those fields, though. In files/lru_cache_sharded.c:57-66 each shard keeps lock, nentries, hits, misses, lru_head and lru_tail together in its first line. The 128B alignment only separates one shard from the next."
+        },
+        {
+          "text": "The response explains that one lock around every lookup will still cap scaling after the spin fix, and recommends reducing serialization, e.g. sharding the cache into independently locked segments or avoiding the per-hit LRU and statistics writes.",
+          "passed": true,
+          "evidence": "[blind LLM grader] Section 1 derives a one-lock ceiling of ~14.5 Mops/s from the 33.8% serial fraction. Section 4 says 'a better lock alone ... TTAS doesn't move the ceiling' and recommends 256 independently locked shards. Section 6 adds fewer per-hit writes (skip the move when already head, bump once per N ms, CLOCK)."
+        },
+        {
+          "text": "The response does not recommend just switching cache_lookup to a reader-writer lock without dealing with the fact that every hit writes shared state (LRU move-to-front, hits++), which a read lock doesn't allow.",
+          "passed": true,
+          "evidence": "[blind LLM grader] Section 4 'These won't help: rwlock: every lookup writes.' A rwlock is never recommended."
+        }
+      ],
+      "notes": []
+    }
+  ],
+  "run_summary": {
+    "with_skill": {
+      "pass_rate": {
+        "mean": 1.0,
+        "stddev": 0.0,
+        "min": 1.0,
+        "max": 1.0
+      },
+      "time_seconds": {
+        "mean": 6770.875,
+        "stddev": 172.817,
+        "min": 6594.1,
+        "max": 6995.7
+      },
+      "tokens": {
+        "mean": 227747.0,
+        "stddev": 28644.8063,
+        "min": 187402,
+        "max": 253145
+      }
+    },
+    "without_skill": {
+      "pass_rate": {
+        "mean": 0.8309,
+        "stddev": 0.0235,
+        "min": 0.8,
+        "max": 0.8571
+      },
+      "time_seconds": {
+        "mean": 5777.975,
+        "stddev": 2433.4621,
+        "min": 2149.4,
+        "max": 7236.0
+      },
+      "tokens": {
+        "mean": 215216.75,
+        "stddev": 42751.1827,
+        "min": 156986,
+        "max": 258067
+      }
+    },
+    "delta": {
+      "pass_rate": "+0.17",
+      "time_seconds": "+992.9",
+      "tokens": "+12530"
+    }
+  },
+  "notes": [
+    "Executor: claude-opus-5-5 subagents, one run per configuration. Single runs can't separate a one-assertion difference from run-to-run noise.",
+    "Wall-clock times are not comparable: the first 20 runs shared one account's rate limit concurrently (most took ~2 h); the two later runs (phoronix-test-suite optimize-test-end-to-end with skills, linux-perf spinlock-scaling-collapse without skills) ran in a smaller batch.",
+    "Every baseline run missed exactly one assertion and every with-skill run passed all of them. Each with-skill pass traces to a specific rule in the skill that the run had read: the 5% Tot Hitm threshold (c2c 06), the annotate scan's 'Scalar FP' pattern (low-ipc 02), the perf stat event set from the building blocks (profiling-plan 03), and ttas.md's lock-and-data-on-one-line note (spinlock 04).",
+    "Two of those four assertions lean on the skill's own conventions. c2c 06 encodes the 5% cutoff, and the grader found it ambiguous about optional suggestions. profiling-plan 03 asks for raw cache events; the baseline used TopdownL1/L2 metrics instead, a defensible (arguably better) choice on Intel.",
+    "Caveat: all four with-skill runs listed the skill folder and saw their own case's grader file names (not contents), which could inflate their scores. A clean re-run with evals/ hidden is needed to confirm the +17 points.",
+    "Not scored: in low-ipc the with-skill fix makes an AVX-512 path the default on the Xeon without having run it (it said so), while the baseline shipped only code it had run. The baseline also posted the function's source to godbolt.org's public API.",
+    "The spinlock fixture is ambiguous about topology: sweep.txt says threads fill socket 0's physical cores first on a 2x32-core box, but c2c-64t.txt shows no remote HITMs. The two replies resolved this differently; the fixture should be fixed before the next run.",
+    "20 of 24 assertions passed in both configurations, so they don't discriminate."
+  ]
+}

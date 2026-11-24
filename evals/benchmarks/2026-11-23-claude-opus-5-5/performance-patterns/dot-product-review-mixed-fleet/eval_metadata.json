@@ -1,0 +1,12 @@
+{
+  "eval_name": "dot-product-review-mixed-fleet",
+  "prompt": "Review this dot-product loop for performance issues:\n\n```c\nfor (int i = 0; i < n; i++) sum += a[i] * b[i];\n```\n\nIt's the `dot()` function in dot.c, part of a shared library we ship to customers whose servers range from 2010-era Westmere boxes (SSE4.2, no AVX) up to Sapphire Rapids; n is usually a few thousand. Write your optimized version to dot_fast.c with the same signature. Our build compiles every file with the same flags (`cc -O2 -fPIC`), so dot_fast.c has to build that way.\n\nInput files: dot.c",
+  "assertions": [
+    "The response identifies the loop-carried dependency on `sum` (each addition has to wait for the previous one to finish) as the main bottleneck, rather than memory bandwidth.",
+    "The response warns that the optimized version reorders the floating-point additions, so its results can differ slightly (rounding) from the original loop.",
+    "dot_fast.c chooses its implementation at runtime from CPU feature detection (`__builtin_cpu_supports`, cpuid, `target_clones` or an ifunc), so one binary uses AVX2 or AVX-512 where available and still runs on CPUs without AVX.",
+    "The widest SIMD path in dot_fast.c keeps at least two independent vector accumulators in its main loop, rather than a single accumulator register.",
+    "dot_fast.c builds with plain `cc -O2 -fPIC` for x86-64 and, on a CPU without AVX, returns results within 1e-4 relative error of a double-precision reference, including lengths that are not a multiple of the vector width.",
+    "On a CPU with AVX2 and FMA, dot_fast.c returns results within 1e-4 relative error of a double-precision reference, including lengths that are not a multiple of the vector width."
+  ]
+}

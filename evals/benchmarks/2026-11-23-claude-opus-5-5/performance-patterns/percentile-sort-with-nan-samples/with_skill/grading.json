@@ -1,0 +1,83 @@
+{
+  "expectations": [
+    {
+      "text": "The response points out that sorting the samples with NaNs in them using std::sort/operator< is invalid (NaN breaks the strict weak ordering), so the existing assumption that NaNs end up at the back isn't guaranteed.",
+      "passed": true,
+      "evidence": "[blind LLM grader] response.md: \"`std::sort` needs a strict weak ordering, and `operator<` stops being one once NaN is present. That is undefined behaviour, and the comment \\\"NaNs end up at the back\\\" isn't what happens\". A demo (bench/nan_sort_demo.cpp) shows about 99% of the NaNs landing inside the first `ok` slots."
+    },
+    {
+      "text": "percentiles_fast.cpp handles NaN samples correctly: it removes or partitions them out before sorting/selecting, or passes hasnan=true to x86-simd-sort, and still reports the failed count.",
+      "passed": true,
+      "evidence": "[blind LLM grader] percentiles_fast.cpp:93-99: a branch-free pass compacts the non-NaN values to the front (bit-pattern NaN test) and sets failed = n - ok. Lines 106-113: selection runs only over [0, ok). Lines 72-74: qselect gets hasnan=false, which is valid only because the NaNs were already removed, as the code comments state. failed is returned, and programmatic 06 passes."
+    },
+    {
+      "text": "The new version avoids fully sorting every sample just to read four percentiles, using a selection algorithm (std::nth_element, x86simdsort::qselect, a partial sort or similar).",
+      "passed": true,
+      "evidence": "[blind LLM grader] percentiles_fast.cpp:69-78 and 103-113: four selections in ascending order on shrinking ranges, using std::nth_element or x86simdsort::qselect. There is no sort, and the reply says the total work is about n + n/2 + n/10 + n/100."
+    },
+    {
+      "text": "The response recommends the x86-simd-sort library (e.g. `x86simdsort::qsort`, `qselect` or `partial_qsort`) for the AVX-512 machines.",
+      "passed": true,
+      "evidence": "[blind LLM grader] response.md line 1: \"on Sapphire Rapids it can optionally use x86-simd-sort's AVX-512 quickselect\". Line 37: -DPERCENTILES_USE_X86SIMDSORT calls `x86simdsort::qselect(..., /*hasnan=*/false)` with runtime AVX-512/AVX2 dispatch. Lines 79-84 give clone, build and bench steps for the SPR box. The code comment (line 23) says \"recommended on Sapphire Rapids\"."
+    },
+    {
+      "text": "percentiles_fast.cpp compiles as C++17 for x86-64 (against the real x86-simd-sort headers if it uses that library) and keeps `Percentiles compute_percentiles(std::vector<float>)`.",
+      "passed": true,
+      "evidence": "[programmatic] x86-simd-sort runtime-dispatch API (lib/x86simdsort.h), linked with libx86simdsortcpp.a: compiles and links"
+    },
+    {
+      "text": "On test data that contains NaNs, compute_percentiles in percentiles_fast.cpp returns the same p50/p90/p99/p999 values and failed count as a reference that drops the NaNs, sorts, and reads the same indices.",
+      "passed": true,
+      "evidence": "[programmatic] CPU without AVX: cases=9 fails=0 new_total_seconds=0.027\nAVX2 CPU: cases=9 fails=0 new_total_seconds=0.027"
+    }
+  ],
+  "summary": {
+    "passed": 6,
+    "failed": 0,
+    "total": 6,
+    "pass_rate": 1.0
+  },
+  "execution_metrics": {
+    "tool_calls": {
+      "Bash": 30,
+      "Read": 7,
+      "Write": 7,
+      "Edit": 10
+    },
+    "total_tool_calls": 54,
+    "errors_encountered": 0
+  },
+  "timing": {
+    "total_duration_seconds": 6781.8
+  },
+  "user_notes_summary": {
+    "uncertainties": [],
+    "needs_review": [
+      "Saw its own case's grader file names in a directory listing of the skill folder (no file contents)."
+    ],
+    "workarounds": []
+  },
+  "eval_feedback": {
+    "suggestions": [],
+    "overall": "No assertion rewards how fast the result actually is, and 04 rewards naming a specific library. A fails 04, yet its dependency-free exact radix select is clearly the faster solution. Programmatic new_total_seconds is 0.004-0.006 for A against 0.027 for B, even with B linked to x86-simd-sort. In the agents' own 20M-sample Rosetta runs, A took 16 ms and B's x86-simd-sort AVX2 path took 43 ms. Consider an assertion on achieved speedup, or letting 04 also accept an equally effective non-comparison selection such as a radix/histogram select. 02 lists only 'removes or partitions them out' or 'hasnan=true'. A's large-n path does neither in memory: it routes NaNs to a separate histogram bin that the rank walk skips, which is equivalent. I passed it on that basis. Rewording 02 as 'excludes NaNs from the ranking' would remove the ambiguity for histogram or radix approaches."
+  },
+  "skill_files_read": [
+    "performance-patterns",
+    "linux-perf",
+    "performance-patterns/SKILL.md",
+    "performance-patterns/triggers/from-profile.md",
+    "performance-patterns/patterns/simd-sort.md",
+    "performance-patterns/guidelines/new-code.md",
+    "performance-patterns/triggers/from-source.md",
+    "linux-perf/SKILL.md",
+    "performance-patterns/library/cpu-dispatch.md",
+    "performance-patterns/SKILL.md\\n-",
+    "performance-patterns/triggers/from-profile.md\\n-",
+    "performance-patterns/triggers/from-source.md\\n-",
+    "performance-patterns/patterns/simd-sort.md\\n-",
+    "performance-patterns/guidelines/new-code.md\\n-",
+    "performance-patterns/references/library-versions.md",
+    "performance-patterns/library/cpu-dispatch.md\\n-",
+    "linux-perf/SKILL.md\\n\\nTransparency"
+  ]
+}

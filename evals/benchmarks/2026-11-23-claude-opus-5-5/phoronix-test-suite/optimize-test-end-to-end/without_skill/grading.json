@@ -1,0 +1,62 @@
+{
+  "expectations": [
+    {
+      "text": "Before changing anything, the agent measures a baseline score with the PTS runner (batch-run or similar) and reports it with its unit (MCells/s).",
+      "passed": true,
+      "evidence": "[blind LLM grader] files/analysis/baseline-pts-run1.txt is a Phoronix Test Suite v10.8.4 run of pts/fluxsim-1.2.0 (16:07:44-16:07:53) giving 'Average: 587.86 MCells/s'. It is older than every optimized source (opt/v1 at 17:48, pkg at 18:03); only the pristine src-orig copy (16:00) is earlier. response.md:13 reports it: 'My first baseline, taken at load 1.7, was 587.9 MCells/s.'"
+    },
+    {
+      "text": "After the agent finishes, an independent `phoronix-test-suite batch-run pts/fluxsim` in the sandbox scores at least 2.5x a fresh install of the original test.",
+      "passed": true,
+      "evidence": "[programmatic] independent batch-run (3 runs each): agent sandbox 2506.48 MCells/s vs fresh original install 539.49 MCells/s -> 4.65x"
+    },
+    {
+      "text": "The optimized build still does the same work: the entry-point script is unchanged (same grid size and iteration count) and the benchmark's printed checksum matches the original build's within 1e-9 relative error.",
+      "passed": true,
+      "evidence": "[programmatic] batch-run pts/fluxsim runs fluxsim-1.3.0; entry-point script is byte-identical to the one install.sh creates; checksum 2129.678810452 vs original 2129.678810452 (relative difference 0.00e+00)"
+    },
+    {
+      "text": "The final report gives the baseline and new scores and the change in percent, and the claimed improvement is within 25% of what the independent re-run measures.",
+      "passed": true,
+      "evidence": "[blind LLM grader] response.md:7 gives '475.8 MCells/s' -> '1967.1 MCells/s', '4.13x' (alternating PTS rounds). The independent re-run measured 2506.48/539.49 = 4.65x, so the claim is 11% low, within 25%. Note: the change is given only as a factor (4.13x = +313%), never as a literal percent; I accepted the factor as the relative change."
+    },
+    {
+      "text": "The report lists the specific code or build changes made and why each helps (e.g. which loop was the bottleneck).",
+      "passed": true,
+      "evidence": "[blind LLM grader] response.md:19-34 gives the profile split (column_flux 59.5%, residual 28.0%, diffuse 12.3%) with causes (8 KB column stride, serial fadd chain). It lists three changes, each with a reason: row-wise colsum (in-order memory, vectorized adds), one fused sweep (1 pass instead of 5, residual chain overlaps the stencil math) and two time steps per sweep (two independent residual chains). All three match fluxsim-1.2-opt.diff."
+    },
+    {
+      "text": "The response tells the user where the modified source lives and how to rebuild it, so the change isn't only in an installed binary.",
+      "passed": true,
+      "evidence": "[blind LLM grader] response.md:46 and 65-71 name the source (analysis/pkg/fluxsim/fluxsim.c), the patch (analysis/fluxsim-1.2-opt.diff), the tarball in pts-root/download-cache and a new profile pts/fluxsim-1.3.0 with checksums in downloads.xml. It says it was built with 'phoronix-test-suite install pts/fluxsim-1.3.0', so a reinstall rebuilds the optimized code from source."
+    }
+  ],
+  "summary": {
+    "passed": 6,
+    "failed": 0,
+    "total": 6,
+    "pass_rate": 1.0
+  },
+  "execution_metrics": {
+    "tool_calls": {
+      "Bash": 68,
+      "Write": 6,
+      "Edit": 5
+    },
+    "total_tool_calls": 79,
+    "errors_encountered": 0
+  },
+  "timing": {
+    "total_duration_seconds": 7747.6
+  },
+  "user_notes_summary": {
+    "uncertainties": [],
+    "needs_review": [],
+    "workarounds": []
+  },
+  "eval_feedback": {
+    "suggestions": [],
+    "overall": "04 asks for 'the change in percent', but A gives only a speedup factor (4.13x, which is +313%). I passed it, treating the factor as the relative change. If a literal percentage is meant, the assertion should say so; otherwise it should say 'relative change (percent or x-factor)'. No assertion covers this: B gets part of its speedup by reordering the residual sum into 8 partial sums. B says so: the residual differs by up to 8.8e-14 relative, which doesn't show in the 12-digit printed checksum. A keeps every floating-point operation bit-identical. The programmatic 03 check compares only the printed checksum, so it can't tell bit-exact results from changes hidden by print precision. No assertion covers this either: A makes the change durable as a new pts/fluxsim-1.3.0 profile plus tarball, so it survives a reinstall, but it also repoints the unversioned pts/fluxsim to 1.3.0, which changes the benchmark's default identity (A disclosed this). B leaves the profile untouched, but force-install wipes its change. Nothing grades durability or side effects on the test-suite configuration."
+  },
+  "skill_files_read": []
+}

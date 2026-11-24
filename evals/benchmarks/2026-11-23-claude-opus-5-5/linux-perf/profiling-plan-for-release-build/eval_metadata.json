@@ -1,0 +1,11 @@
+{
+  "eval_name": "profiling-plan-for-release-build",
+  "prompt": "I need to find out where our C++ ingest service spends its time. It's built with `cmake -S . -B build -DCMAKE_BUILD_TYPE=Release` (so -O3 -DNDEBUG), and the benchmark run is `./build/bin/ingest --replay traces/day1.bin`, which takes about 40 s. It runs on an Ubuntu 24.04 Xeon server; I'll run the commands there myself (you don't have access to it). Give me the exact commands to run, in order, and tell me what to look for in each output.",
+  "assertions": [
+    "The plan adds debug info without changing the optimization level being profiled: it keeps -O3 (e.g. adds -g to CMAKE_CXX_FLAGS or CMAKE_CXX_FLAGS_RELEASE) and does not switch to RelWithDebInfo or -O2, or, if it mentions RelWithDebInfo, it warns that this changes -O3 to -O2.",
+    "The plan includes a step to check perf_event_paranoid (or otherwise check perf permissions) before collecting, and says what to do if it's too restrictive (run with sudo or lower the setting).",
+    "The plan includes a perf stat counting pass (cycles, instructions, cache and branch events) and explains how to read IPC and the miss rates from it.",
+    "The plan includes perf record with call-graph collection that works on an -O3 build without frame pointers (`--call-graph dwarf` or `lbr`, or rebuilding with -fno-omit-frame-pointer) and perf report to rank the hot functions.",
+    "The plan includes perf annotate (or perf report's annotate view) to drill into the hottest functions at the source-line or instruction level."
+  ]
+}

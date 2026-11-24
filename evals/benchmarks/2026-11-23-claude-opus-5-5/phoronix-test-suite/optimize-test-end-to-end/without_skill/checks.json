@@ -1,0 +1,32 @@
+{
+  "checks": [
+    {
+      "grader": "02-real-speedup",
+      "passed": true,
+      "evidence": "independent batch-run (3 runs each): agent sandbox 2506.48 MCells/s vs fresh original install 539.49 MCells/s -> 4.65x"
+    },
+    {
+      "grader": "03-same-work-same-result",
+      "passed": true,
+      "evidence": "batch-run pts/fluxsim runs fluxsim-1.3.0; entry-point script is byte-identical to the one install.sh creates; checksum 2129.678810452 vs original 2129.678810452 (relative difference 0.00e+00)"
+    }
+  ],
+  "info": {
+    "independent_speedup": 4.646017535079427,
+    "agent_score": 2506.48,
+    "original_score": 539.49,
+    "changed_files": [
+      "+ download-cache/fluxsim-1.2-opt.tar.gz",
+      "+ installed-tests/pts/fluxsim-1.3.0/fluxsim",
+      "+ installed-tests/pts/fluxsim-1.3.0/fluxsim-1.2-opt.tar.gz",
+      "+ installed-tests/pts/fluxsim-1.3.0/fluxsim-bin",
+      "+ installed-tests/pts/fluxsim-1.3.0/test-exit-status",
+      "+ test-profiles/pts/fluxsim-1.3.0/changelog.json",
+      "+ test-profiles/pts/fluxsim-1.3.0/downloads.xml",
+      "+ test-profiles/pts/fluxsim-1.3.0/generated.json",
+      "+ test-profiles/pts/fluxsim-1.3.0/install.sh",
+      "+ test-profiles/pts/fluxsim-1.3.0/results-definition.xml",
+      "+ test-profiles/pts/fluxsim-1.3.0/test-definition.xml"
+    ]
+  }
+}

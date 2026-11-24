@@ -1,0 +1,65 @@
+{
+  "expectations": [
+    {
+      "text": "After the rebuild, the test's entry-point script (pts-root/installed-tests/pts/fluxsim-1.2.0/fluxsim) still exists, unchanged, as the original wrapper script.",
+      "passed": true,
+      "evidence": "[programmatic] entry-point script is byte-identical to the one install.sh creates"
+    },
+    {
+      "text": "The installed fluxsim-bin was rebuilt with debug info (-g): its debug map lists object files (`nm -ap` shows OSO entries) or a matching .dSYM sits next to it.",
+      "passed": true,
+      "evidence": "[programmatic] debug map present (1 OSO entries, e.g. $TMPDIR/fluxsim-8aaa66.o); dSYM bundle next to the binary: fluxsim-bin.dSYM"
+    },
+    {
+      "text": "The rebuilt binary keeps the original optimization flags (-O2 from install.sh): it reports a build with -O2 (not -O0) and its throughput is within 20% of a fresh original build.",
+      "passed": true,
+      "evidence": "[programmatic] rebuilt binary reports build flags '-O2 -g'; throughput 573.39 vs fresh -O2 build 571.85 MCells/s (ratio 1.00)"
+    },
+    {
+      "text": "`phoronix-test-suite batch-run pts/fluxsim` still completes and reports a result after the rebuild.",
+      "passed": true,
+      "evidence": "[programmatic] batch-run reported 588.86 MCells/s"
+    },
+    {
+      "text": "The response tells the user what was rebuilt and how (or where the source now lives), so they can repeat it.",
+      "passed": true,
+      "evidence": "[blind LLM grader] response.md 'What changed' table says the binary was rebuilt in pts-root/installed-tests/pts/fluxsim-1.2.0/ with \"install.sh's own build step plus -g: cc -O2 -g ... -o fluxsim-bin fluxsim.c -lm\", and that the source is kept in \"src/fluxsim/\" (re-extracted from the cached tarball). The 'If PTS reinstalls the test' section gives a copy-pasteable recipe to run from the working directory (tar -xzf $D/fluxsim-1.2.tar.gz -C $D/src; make -B -C $D/src/fluxsim CFLAGS=\"-O2 -g\"; copy the binary to a new name and mv it into place; cp -R the dSYM), says it was tested on a freshly reinstalled copy, and explains why each step is needed. The source location matches measurements.json (+ src/fluxsim/{Makefile,README,fluxsim.c}). The user has enough to repeat the rebuild."
+    }
+  ],
+  "summary": {
+    "passed": 5,
+    "failed": 0,
+    "total": 5,
+    "pass_rate": 1.0
+  },
+  "execution_metrics": {
+    "tool_calls": {
+      "Bash": 29,
+      "Read": 3,
+      "Write": 2
+    },
+    "total_tool_calls": 34,
+    "errors_encountered": 0
+  },
+  "timing": {
+    "total_duration_seconds": 655.7
+  },
+  "user_notes_summary": {
+    "uncertainties": [],
+    "needs_review": [
+      "Saw its own case's grader file names in a directory listing of the skill folder (no file contents)."
+    ],
+    "workarounds": []
+  },
+  "eval_feedback": {
+    "suggestions": [],
+    "overall": "05-explains-rebuild is loose as worded: \"what was rebuilt and how (or where the source now lives)\" lets a reply pass on naming the source location alone, without the build command or flags, even though it couldn't be repeated from that. Consider requiring the actual commands or flags (or a script) that reproduce the debug build, especially after a force-install wipes the install dir. Both replies here clear the stricter bar anyway."
+  },
+  "skill_files_read": [
+    "phoronix-test-suite/",
+    "phoronix-test-suite",
+    "phoronix-test-suite/SKILL.md",
+    "linux-perf",
+    "linux-perf/SKILL.md"
+  ]
+}

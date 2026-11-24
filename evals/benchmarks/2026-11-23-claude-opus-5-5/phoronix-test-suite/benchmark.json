@@ -1,0 +1,261 @@
+{
+  "metadata": {
+    "skill_name": "phoronix-test-suite",
+    "skill_path": "skills/phoronix-test-suite",
+    "executor_model": "claude-opus-5-5",
+    "analyzer_model": "claude-opus-5-5",
+    "timestamp": "2026-11-24T04:19:24Z",
+    "evals_run": [
+      "optimize-test-end-to-end",
+      "rebuild-test-with-debug-info"
+    ],
+    "runs_per_configuration": 1
+  },
+  "runs": [
+    {
+      "eval_id": "optimize-test-end-to-end",
+      "eval_name": "optimize-test-end-to-end",
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 0.8333,
+        "passed": 5,
+        "failed": 1,
+        "total": 6,
+        "time_seconds": 1916.6,
+        "tokens": 324108,
+        "tool_calls": 111,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Before changing anything, the agent measures a baseline score with the PTS runner (batch-run or similar) and reports it with its unit (MCells/s).",
+          "passed": true,
+          "evidence": "[blind LLM grader] response.md:5-6: 'Baseline - Score: 582.98 MCells/s (5 runs, deviation 0.62%). This is the stock install'. Line 41 calls it 'the recorded baseline'. ab_quiet.sh:27 shows the agent's PTS call 'FORCE_TIMES_TO_RUN=5 ./bin/phoronix-test-suite batch-run pts/fluxsim-1.2.0', which matches the 5-run/deviation format. There is no raw baseline log in files/, so the before-any-change order rests on the reply's 'stock install' / 'recorded baseline' wording."
+        },
+        {
+          "text": "After the agent finishes, an independent `phoronix-test-suite batch-run pts/fluxsim` in the sandbox scores at least 2.5x a fresh install of the original test.",
+          "passed": true,
+          "evidence": "[programmatic] independent batch-run (3 runs each): agent sandbox 2987.94 MCells/s vs fresh original install 542.85 MCells/s -> 5.50x"
+        },
+        {
+          "text": "The optimized build still does the same work: the entry-point script is unchanged (same grid size and iteration count) and the benchmark's printed checksum matches the original build's within 1e-9 relative error.",
+          "passed": true,
+          "evidence": "[programmatic] batch-run pts/fluxsim runs fluxsim-1.2.0; entry-point script is byte-identical to the one install.sh creates; checksum 2129.678810452 vs original 2129.678810452 (relative difference 0.00e+00)"
+        },
+        {
+          "text": "The final report gives the baseline and new scores and the change in percent, and the claimed improvement is within 25% of what the independent re-run measures.",
+          "passed": true,
+          "evidence": "[blind LLM grader] response.md:3 and 40-42 give the baseline (582.98 MCells/s), the result (3019.71 MCells/s) and 'Delta ... (+418%)', plus alternating runs at '+443% (5.4x)'. The independent re-run measured 5.50x (+450%), so the claims of 5.18x and 5.4x are 6% and 2% low, within 25%."
+        },
+        {
+          "text": "The report lists the specific code or build changes made and why each helps (e.g. which loop was the bottleneck).",
+          "passed": true,
+          "evidence": "[blind LLM grader] response.md:14-29 has a table of kernels with share and cause (column_flux 60.2%: column walk with an 8 KB stride; residual 28.4%: one serial accumulator). It lists changes 1-4, each with a reason: row-wise column sums, a single pass, 8 independent partial sums, an aligned-start peel (+18%) and noinline (avoids ~25% loss from unpaired ldp/stp). All of these match fluxsim-1.2-fused.patch."
+        },
+        {
+          "text": "The response tells the user where the modified source lives and how to rebuild it, so the change isn't only in an installed binary.",
+          "passed": false,
+          "evidence": "[blind LLM grader] response.md:67-69 says where the source lives (installed-tests/pts/fluxsim-1.2.0/src/fluxsim/fluxsim.c) and gives a patch for fluxsim-1.2.tar.gz. It never says how to rebuild: no make/cc command and no patch-and-install steps. Line 54 says 'force-install rebuilds from the original tarball', and line 60 leaves surviving a reinstall as a pending idea."
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": "rebuild-test-with-debug-info",
+      "eval_name": "rebuild-test-with-debug-info",
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 5,
+        "failed": 0,
+        "total": 5,
+        "time_seconds": 655.7,
+        "tokens": 145377,
+        "tool_calls": 34,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "After the rebuild, the test's entry-point script (pts-root/installed-tests/pts/fluxsim-1.2.0/fluxsim) still exists, unchanged, as the original wrapper script.",
+          "passed": true,
+          "evidence": "[programmatic] entry-point script is byte-identical to the one install.sh creates"
+        },
+        {
+          "text": "The installed fluxsim-bin was rebuilt with debug info (-g): its debug map lists object files (`nm -ap` shows OSO entries) or a matching .dSYM sits next to it.",
+          "passed": true,
+          "evidence": "[programmatic] debug map present (1 OSO entries, e.g. $TMPDIR/fluxsim-8aaa66.o); dSYM bundle next to the binary: fluxsim-bin.dSYM"
+        },
+        {
+          "text": "The rebuilt binary keeps the original optimization flags (-O2 from install.sh): it reports a build with -O2 (not -O0) and its throughput is within 20% of a fresh original build.",
+          "passed": true,
+          "evidence": "[programmatic] rebuilt binary reports build flags '-O2 -g'; throughput 573.39 vs fresh -O2 build 571.85 MCells/s (ratio 1.00)"
+        },
+        {
+          "text": "`phoronix-test-suite batch-run pts/fluxsim` still completes and reports a result after the rebuild.",
+          "passed": true,
+          "evidence": "[programmatic] batch-run reported 588.86 MCells/s"
+        },
+        {
+          "text": "The response tells the user what was rebuilt and how (or where the source now lives), so they can repeat it.",
+          "passed": true,
+          "evidence": "[blind LLM grader] response.md 'What changed' table says the binary was rebuilt in pts-root/installed-tests/pts/fluxsim-1.2.0/ with \"install.sh's own build step plus -g: cc -O2 -g ... -o fluxsim-bin fluxsim.c -lm\", and that the source is kept in \"src/fluxsim/\" (re-extracted from the cached tarball). The 'If PTS reinstalls the test' section gives a copy-pasteable recipe to run from the working directory (tar -xzf $D/fluxsim-1.2.tar.gz -C $D/src; make -B -C $D/src/fluxsim CFLAGS=\"-O2 -g\"; copy the binary to a new name and mv it into place; cp -R the dSYM), says it was tested on a freshly reinstalled copy, and explains why each step is needed. The source location matches measurements.json (+ src/fluxsim/{Makefile,README,fluxsim.c}). The user has enough to repeat the rebuild."
+        }
+      ],
+      "notes": [
+        "Saw its own case's grader file names in a directory listing of the skill folder (no file contents)."
+      ]
+    },
+    {
+      "eval_id": "optimize-test-end-to-end",
+      "eval_name": "optimize-test-end-to-end",
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 6,
+        "failed": 0,
+        "total": 6,
+        "time_seconds": 7747.6,
+        "tokens": 276959,
+        "tool_calls": 79,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "Before changing anything, the agent measures a baseline score with the PTS runner (batch-run or similar) and reports it with its unit (MCells/s).",
+          "passed": true,
+          "evidence": "[blind LLM grader] files/analysis/baseline-pts-run1.txt is a Phoronix Test Suite v10.8.4 run of pts/fluxsim-1.2.0 (16:07:44-16:07:53) giving 'Average: 587.86 MCells/s'. It is older than every optimized source (opt/v1 at 17:48, pkg at 18:03); only the pristine src-orig copy (16:00) is earlier. response.md:13 reports it: 'My first baseline, taken at load 1.7, was 587.9 MCells/s.'"
+        },
+        {
+          "text": "After the agent finishes, an independent `phoronix-test-suite batch-run pts/fluxsim` in the sandbox scores at least 2.5x a fresh install of the original test.",
+          "passed": true,
+          "evidence": "[programmatic] independent batch-run (3 runs each): agent sandbox 2506.48 MCells/s vs fresh original install 539.49 MCells/s -> 4.65x"
+        },
+        {
+          "text": "The optimized build still does the same work: the entry-point script is unchanged (same grid size and iteration count) and the benchmark's printed checksum matches the original build's within 1e-9 relative error.",
+          "passed": true,
+          "evidence": "[programmatic] batch-run pts/fluxsim runs fluxsim-1.3.0; entry-point script is byte-identical to the one install.sh creates; checksum 2129.678810452 vs original 2129.678810452 (relative difference 0.00e+00)"
+        },
+        {
+          "text": "The final report gives the baseline and new scores and the change in percent, and the claimed improvement is within 25% of what the independent re-run measures.",
+          "passed": true,
+          "evidence": "[blind LLM grader] response.md:7 gives '475.8 MCells/s' -> '1967.1 MCells/s', '4.13x' (alternating PTS rounds). The independent re-run measured 2506.48/539.49 = 4.65x, so the claim is 11% low, within 25%. Note: the change is given only as a factor (4.13x = +313%), never as a literal percent; I accepted the factor as the relative change."
+        },
+        {
+          "text": "The report lists the specific code or build changes made and why each helps (e.g. which loop was the bottleneck).",
+          "passed": true,
+          "evidence": "[blind LLM grader] response.md:19-34 gives the profile split (column_flux 59.5%, residual 28.0%, diffuse 12.3%) with causes (8 KB column stride, serial fadd chain). It lists three changes, each with a reason: row-wise colsum (in-order memory, vectorized adds), one fused sweep (1 pass instead of 5, residual chain overlaps the stencil math) and two time steps per sweep (two independent residual chains). All three match fluxsim-1.2-opt.diff."
+        },
+        {
+          "text": "The response tells the user where the modified source lives and how to rebuild it, so the change isn't only in an installed binary.",
+          "passed": true,
+          "evidence": "[blind LLM grader] response.md:46 and 65-71 name the source (analysis/pkg/fluxsim/fluxsim.c), the patch (analysis/fluxsim-1.2-opt.diff), the tarball in pts-root/download-cache and a new profile pts/fluxsim-1.3.0 with checksums in downloads.xml. It says it was built with 'phoronix-test-suite install pts/fluxsim-1.3.0', so a reinstall rebuilds the optimized code from source."
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": "rebuild-test-with-debug-info",
+      "eval_name": "rebuild-test-with-debug-info",
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 5,
+        "failed": 0,
+        "total": 5,
+        "time_seconds": 6416.9,
+        "tokens": 148214,
+        "tool_calls": 37,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "After the rebuild, the test's entry-point script (pts-root/installed-tests/pts/fluxsim-1.2.0/fluxsim) still exists, unchanged, as the original wrapper script.",
+          "passed": true,
+          "evidence": "[programmatic] entry-point script is byte-identical to the one install.sh creates"
+        },
+        {
+          "text": "The installed fluxsim-bin was rebuilt with debug info (-g): its debug map lists object files (`nm -ap` shows OSO entries) or a matching .dSYM sits next to it.",
+          "passed": true,
+          "evidence": "[programmatic] debug map present (1 OSO entries, e.g. $TMPDIR/fluxsim-b1bf1a.o); dSYM bundle next to the binary: fluxsim-bin.dSYM"
+        },
+        {
+          "text": "The rebuilt binary keeps the original optimization flags (-O2 from install.sh): it reports a build with -O2 (not -O0) and its throughput is within 20% of a fresh original build.",
+          "passed": true,
+          "evidence": "[programmatic] rebuilt binary reports build flags '-O2 -g -fdebug-prefix-map=<work>/pts-root/installed-tests/pts/fluxsim-1.2.0/fluxsim=<work>/pts-root/installed-tests/pts/fluxsim-1.2.0/fluxsim-src -dsym-dir <work>/pts-root/installed-tests/pts/fluxsim-1.2.0'; throughput 567.96 vs fresh -O2 build 573.15 MCells/s (ratio 0.99)"
+        },
+        {
+          "text": "`phoronix-test-suite batch-run pts/fluxsim` still completes and reports a result after the rebuild.",
+          "passed": true,
+          "evidence": "[programmatic] batch-run reported 588.06 MCells/s"
+        },
+        {
+          "text": "The response tells the user what was rebuilt and how (or where the source now lives), so they can repeat it.",
+          "passed": true,
+          "evidence": "[blind LLM grader] response.md 'What I ran' gives the exact commands from the dir containing bin/ and pts-root/: DEST=\"$(pwd -P)/pts-root/installed-tests/pts/fluxsim-1.2.0\"; CFLAGS=\"-g -fdebug-prefix-map=$DEST/fluxsim=$DEST/fluxsim-src -dsym-dir $DEST\" ./bin/phoronix-test-suite force-install pts/fluxsim; then tar -xzf \"$DEST/fluxsim-1.2.tar.gz\" -C \"$DEST/fluxsim-src\" --strip-components 1. It explains what each flag does, lists what the install dir now holds (fluxsim-bin, fluxsim-bin.dSYM, fluxsim-src/), and the Notes say \"Any force-install wipes the install dir, so re-run the commands above to get the debug build back\". The source location matches measurements.json (+ fluxsim-src/{Makefile,README,fluxsim.c}). The user has enough to repeat the rebuild."
+        }
+      ],
+      "notes": []
+    }
+  ],
+  "run_summary": {
+    "with_skill": {
+      "pass_rate": {
+        "mean": 0.9166,
+        "stddev": 0.1179,
+        "min": 0.8333,
+        "max": 1.0
+      },
+      "time_seconds": {
+        "mean": 1286.15,
+        "stddev": 891.5909,
+        "min": 655.7,
+        "max": 1916.6
+      },
+      "tokens": {
+        "mean": 234742.5,
+        "stddev": 126381.9021,
+        "min": 145377,
+        "max": 324108
+      }
+    },
+    "without_skill": {
+      "pass_rate": {
+        "mean": 1.0,
+        "stddev": 0.0,
+        "min": 1.0,
+        "max": 1.0
+      },
+      "time_seconds": {
+        "mean": 7082.25,
+        "stddev": 940.947,
+        "min": 6416.9,
+        "max": 7747.6
+      },
+      "tokens": {
+        "mean": 212586.5,
+        "stddev": 91036.4625,
+        "min": 148214,
+        "max": 276959
+      }
+    },
+    "delta": {
+      "pass_rate": "-0.08",
+      "time_seconds": "-5796.1",
+      "tokens": "+22156"
+    }
+  },
+  "notes": [
+    "Executor: claude-opus-5-5 subagents, one run per configuration. Single runs can't separate a one-assertion difference from run-to-run noise.",
+    "Wall-clock times are not comparable: the first 20 runs shared one account's rate limit concurrently (most took ~2 h); the two later runs (phoronix-test-suite optimize-test-end-to-end with skills, linux-perf spinlock-scaling-collapse without skills) ran in a smaller batch.",
+    "Independent re-measurement on an idle machine: with-skill 5.50x vs baseline 4.65x on pts/fluxsim. Both printed the original checksum, kept the entry script intact and cleared the 2.5x bar.",
+    "Part of the with-skill gain comes from splitting the residual sum into 8 partial sums (the skill's parallel-accumulator pattern), so its residual differs from the original by up to 8.8e-14 relative, below the printed checksum's precision. It said so and offered a bit-exact variant at about 2.9x. The baseline kept every floating-point operation bit-identical.",
+    "The with-skill run failed only 06-reproducible: it said where the patched source and a patch file are, but gave no rebuild steps, and noted that a reinstall undoes the change. Its report followed the skill's Optimization Report template (Baseline, Changes Made, Result, Pending Ideas), which has no slot for this.",
+    "The baseline packaged its optimization as a new test profile (pts/fluxsim-1.3.0), so it survives a reinstall, and left 1.2.0 untouched for comparison. The unversioned pts/fluxsim now resolves to 1.3.0, which it pointed out.",
+    "rebuild case: both configurations passed every check (entry script intact, -O2 kept, dSYM next to the binary). The in-place extraction trap the skill warns about didn't catch the baseline.",
+    "The with-skill optimize run used a copy of the skills without evals/; the with-skill rebuild run saw its grader file names."
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "eval_name": "low-ipc-serial-fma-loop",
+  "prompt": "This function runs at only 1.2 IPC despite low cache misses, on a Xeon that should manage 4+. What's wrong, and how do I fix it? From the box I've attached perf stat and perf report output (perf-stat.txt), perf annotate of the function (perf-annotate.txt) and the CPU details (cpu.txt); the source is residuals.c.\n\nInput files: residuals.c, perf-stat.txt, perf-annotate.txt, cpu.txt",
+  "assertions": [
+    "The response explains that the loop is latency-bound on the single accumulator `s`: each vfmadd231sd has to wait for the previous one (about 4 cycles), and it cites the annotate evidence (the FMA into %xmm0 carrying ~90% of the samples).",
+    "The response notes that the hot loop is scalar double precision (`sd` instructions on xmm registers) even though the CPU supports AVX2/AVX-512, i.e. the loop isn't vectorized.",
+    "The response explains that the compiler won't reassociate or vectorize this floating-point reduction at -O2 unless allowed to (e.g. -ffast-math/-fassociative-math, `#pragma omp simd reduction`, or a manual rewrite).",
+    "The proposed fix breaks the dependency chain with multiple independent accumulators and/or SIMD vector accumulators, and shows the code.",
+    "The response warns that reordering the additions can change the result slightly (rounding), so it won't be bit-identical to the serial loop.",
+    "The response says how to confirm the fix with perf, e.g. re-running perf stat to compare IPC/cycles or counting packed vs scalar FP instructions (fp_arith_inst_retired.*)."
+  ]
+}

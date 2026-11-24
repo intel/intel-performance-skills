@@ -1,0 +1,22 @@
+{
+  "checks": [
+    {
+      "grader": "05-correct-without-avx",
+      "passed": true,
+      "evidence": "CPU without AVX: cases=66 fails=0 worst_relerr=5.73e-08"
+    },
+    {
+      "grader": "06-correct-with-avx2",
+      "passed": true,
+      "evidence": "AVX2+FMA CPU: cases=66 fails=0 worst_relerr=5.73e-08"
+    }
+  ],
+  "info": {
+    "functions_using_wide_regs": {
+      "_dot_avx2": [
+        "vzeroupper",
+        "ymm"
+      ]
+    }
+  }
+}

@@ -1,0 +1,80 @@
+{
+  "expectations": [
+    {
+      "text": "The new implementation builds with plain `cc -O2 -fPIC` for x86-64 and returns exactly what the original crc32c() returns (same seed convention) for random buffers of 0 to 70,000 bytes at unaligned addresses, for chained calls, and for the '123456789' check string (0xE3069283 after the final inversion), with and without AVX available.",
+      "passed": true,
+      "evidence": "[programmatic] CPU without AVX (SSE4.2+PCLMUL): cases=652 fails=0 | throughput_64k_GBps new=35.80 original=0.51 | throughput_4k_GBps new=35.33 original=0.51\nAVX2 CPU (no AVX-512): cases=652 fails=0 | throughput_64k_GBps new=65.77 original=0.51 | throughput_4k_GBps new=63.13 original=0.51"
+    },
+    {
+      "text": "On SSE4.2 CPUs the new implementation uses the hardware CRC32 instruction (`_mm_crc32_u64`/`crc32q`) and/or PCLMULQDQ folding rather than a byte-at-a-time table lookup.",
+      "passed": true,
+      "evidence": "[blind LLM grader] crc32c_fast.c:453-470 crc32c_hw feeds 8-byte words to `_mm_crc32_u64`. The dispatcher (760-795, list at 741-750) picks the sse4.2 / sse4.2-pclmul / avx2 / avx512 kernels from the CPUID SSE4.2 bit. The byte table is only the 'portable' last fallback. measurements.json shows crc32 (plus pclmul) in all four SIMD functions, and the no-AVX CPU ran at 35.8 GB/s against 0.51 GB/s for the original."
+    },
+    {
+      "text": "The fast path removes the serial dependency of a single CRC chain, e.g. by running several independent CRC streams over different parts of the buffer and combining them, or by folding with PCLMULQDQ, instead of feeding one `_mm_crc32_u64` accumulator 8 bytes at a time.",
+      "passed": true,
+      "evidence": "[blind LLM grader] crc32c_fast.c:520-534 crc32c_3way_block runs three independent crc32 streams (c0/c1/c2) over separate thirds of each block and merges them with PCLMULQDQ shifts (crc32c_shift). This is the Westmere (sse4.2-pclmul) path. The avx2 block (581-619) adds 4 xmm PCLMUL folding accumulators beside 3 crc32 streams, and the avx512 block (654-704) uses 4 zmm folds plus 4 crc32 streams. Only CPUs without PCLMUL (none in the fleet) or inputs under 80 bytes use a single chain."
+    },
+    {
+      "text": "There is a VPCLMULQDQ/AVX-512 code path that is selected at runtime on CPUs that support it (Ice Lake / Sapphire Rapids).",
+      "passed": true,
+      "evidence": "[blind LLM grader] crc32c_fast.c:646-721 crc32c_avx512 folds 4 zmm accumulators with `_mm512_clmulepi64_epi128`. It is the first entry in crc32c_impls (742-745) and is chosen when CPUID leaf 7 shows AVX512F (EBX bit 16) and VPCLMULQDQ (ECX bit 10) and XCR0&0xe6 is set (789-792), subject to the startup self-test. It is compiled in on GCC>=8 / clang>=6. measurements.json shows zmm and pclmul in _crc32c_avx512 from the production build, and tests/emu_avx512.h with run_tests.sh checks the kernel's algorithm through an emulator."
+    }
+  ],
+  "summary": {
+    "passed": 4,
+    "failed": 0,
+    "total": 4,
+    "pass_rate": 1.0
+  },
+  "execution_metrics": {
+    "tool_calls": {
+      "Bash": 101,
+      "Read": 6,
+      "Write": 7,
+      "Edit": 1,
+      "Agent": 2,
+      "ListAgents": 8,
+      "ToolSearch": 1,
+      "TaskStop": 1,
+      "WebFetch": 3
+    },
+    "total_tool_calls": 130,
+    "errors_encountered": 0
+  },
+  "timing": {
+    "total_duration_seconds": 10294.9
+  },
+  "user_notes_summary": {
+    "uncertainties": [],
+    "needs_review": [
+      "Saw its own case's grader file names in a directory listing of the skill folder (no file contents).",
+      "Run was cut off by the account's usage limit before it wrote its final reply."
+    ],
+    "workarounds": []
+  },
+  "eval_feedback": {
+    "suggestions": [],
+    "overall": "No assertion covers speed on AVX2-class CPUs (Haswell to Cascade Lake, Zen 1-3), which are probably much of the fleet. On the AVX2 CPU model, A's avx2-pclmul fold+crc32 kernel reached 65.8 GB/s. B stayed at 35.8 GB/s, its no-AVX speed. B's hybrid fold+crc32 kernel only runs when the vendor is GenuineIntel and ADX is reported (crc32c_fast.c:609, 638), so AMD Zen 1-3 can never get it. 04 cannot tell a correct AVX-512 path from a wrong one, and 01 never runs that path because it only tests the no-AVX and AVX2 CPU models. A kernel that exists and is CPUID-gated but returns wrong CRCs would pass both 01 and 04, and would write bad on-disk checksums on Sapphire Rapids. Both attempts here protect against this with an emulated AVX-512 test and a startup self-test, but the eval doesn't require either."
+  },
+  "skill_files_read": [
+    "performance-patterns",
+    "linux-perf",
+    "performance-patterns/SKILL.md",
+    "performance-patterns/triggers/from-source.md",
+    "performance-patterns/patterns/fast-crc32c.md",
+    "performance-patterns/patterns/fast-crc32c-impl.md",
+    "performance-patterns/library/cpu-dispatch.md",
+    "performance-patterns/library/crc32c_avx512_vpclmulqdq.c",
+    "performance-patterns/library/crc32c_sse42.c",
+    "performance-patterns/library/crc32c_portable.c",
+    "performance-patterns/SKILL.md\\n-",
+    "performance-patterns/triggers/from-source.md\\n-",
+    "performance-patterns/patterns/fast-crc32c.md\\n-",
+    "performance-patterns/patterns/fast-crc32c-impl.md\\n-",
+    "performance-patterns/library/cpu-dispatch.md\\n-",
+    "performance-patterns/library/crc32c_avx512_vpclmulqdq.c\\n-",
+    "performance-patterns/library/crc32c_sse42.c\\n-",
+    "performance-patterns/library/crc32c_portable.c\\n\\nNot"
+  ]
+}

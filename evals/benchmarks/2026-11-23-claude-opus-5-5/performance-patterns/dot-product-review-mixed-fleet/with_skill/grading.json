@@ -1,0 +1,78 @@
+{
+  "expectations": [
+    {
+      "text": "The response identifies the loop-carried dependency on `sum` (each addition has to wait for the previous one to finish) as the main bottleneck, rather than memory bandwidth.",
+      "passed": true,
+      "evidence": "[blind LLM grader] response.md:11 'One accumulator means one long dependency chain. This is the main problem. Each += needs the previous sum, so the loop does one element per floating-point add latency (about 3-4 cycles)'. It brings up memory bandwidth only for data coming from main memory (line 100)."
+    },
+    {
+      "text": "The response warns that the optimized version reorders the floating-point additions, so its results can differ slightly (rounding) from the original loop.",
+      "passed": true,
+      "evidence": "[blind LLM grader] response.md:42, under 'Floating-point behaviour (please read)': 'Results won't be bit-identical to the old dot(). The additions happen in a different order ... The differences are at rounding level'."
+    },
+    {
+      "text": "dot_fast.c chooses its implementation at runtime from CPU feature detection (`__builtin_cpu_supports`, cpuid, `target_clones` or an ifunc), so one binary uses AVX2 or AVX-512 where available and still runs on CPUs without AVX.",
+      "passed": true,
+      "evidence": "[blind LLM grader] dot_fast.c:231-240 picks dot_avx512, dot_avx2 or dot_sse2 with __builtin_cpu_supports('avx2'/'fma'/'avx512f') on the first call and caches the choice in a function pointer (248-263). The SSE2 baseline and the dispatcher have no target attribute, and the programmatic no-AVX run passed."
+    },
+    {
+      "text": "The widest SIMD path in dot_fast.c keeps at least two independent vector accumulators in its main loop, rather than a single accumulator register.",
+      "passed": true,
+      "evidence": "[blind LLM grader] The widest path, dot_avx512 (dot_fast.c:183-226), declares 8 __m512 accumulators s0..s7, and its main loop (198-201) does one _mm512_fmadd_ps into each."
+    },
+    {
+      "text": "dot_fast.c builds with plain `cc -O2 -fPIC` for x86-64 and, on a CPU without AVX, returns results within 1e-4 relative error of a double-precision reference, including lengths that are not a multiple of the vector width.",
+      "passed": true,
+      "evidence": "[programmatic] CPU without AVX: cases=66 fails=0 worst_relerr=4.44e-08"
+    },
+    {
+      "text": "On a CPU with AVX2 and FMA, dot_fast.c returns results within 1e-4 relative error of a double-precision reference, including lengths that are not a multiple of the vector width.",
+      "passed": true,
+      "evidence": "[programmatic] AVX2+FMA CPU: cases=66 fails=0 worst_relerr=5.73e-08"
+    }
+  ],
+  "summary": {
+    "passed": 6,
+    "failed": 0,
+    "total": 6,
+    "pass_rate": 1.0
+  },
+  "execution_metrics": {
+    "tool_calls": {
+      "Bash": 24,
+      "Read": 11,
+      "Write": 4,
+      "Edit": 7
+    },
+    "total_tool_calls": 46,
+    "errors_encountered": 0
+  },
+  "timing": {
+    "total_duration_seconds": 6991.3
+  },
+  "user_notes_summary": {
+    "uncertainties": [],
+    "needs_review": [
+      "Saw its own case's grader file names in a directory listing of the skill folder (no file contents)."
+    ],
+    "workarounds": []
+  },
+  "eval_feedback": {
+    "suggestions": [],
+    "overall": "No assertion captures this difference: A uses AVX-512 and FMA and warns that results differ between Westmere and newer boxes. B deliberately leaves out FMA and AVX-512, so every CPU in the fleet returns bit-identical results, and it argues that AVX-512 is not worth it at n of a few thousand. The 'AVX2 or AVX-512' wording of 03 passes both, and nothing checks whether a response deals with results differing across machines, which matters for a library shipped to a mixed fleet. No check executes an AVX-512 path, because Rosetta stops at AVX2. A broken AVX-512 kernel would therefore pass every assertion, and A's 04 is graded on code that nobody has run. From reading it, A's kernel looks correct: a masked tail load ending at a[n-1], and 8 accumulators."
+  },
+  "skill_files_read": [
+    "performance-patterns",
+    "performance-patterns/SKILL.md",
+    "performance-patterns/triggers/from-source.md",
+    "performance-patterns/guidelines/new-code.md",
+    "performance-patterns/patterns/parallel-accumulator.md",
+    "performance-patterns/library/cpu-dispatch.md",
+    "performance-patterns/patterns/simd-upconversion.md",
+    "performance-patterns/patterns/missing-vzeroupper.md",
+    "performance-patterns/patterns/missing-restrict.md",
+    "performance-patterns/references/known-algorithms.md",
+    "performance-patterns/patterns/simd-upconversion-impl.md",
+    "performance-patterns/"
+  ]
+}

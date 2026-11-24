@@ -1,0 +1,6 @@
+{
+  "total_tokens": 231206,
+  "duration_ms": 7235999,
+  "total_duration_seconds": 7236.0,
+  "note": "wall-clock inflated: 20 runs shared the account's rate limit concurrently"
+}

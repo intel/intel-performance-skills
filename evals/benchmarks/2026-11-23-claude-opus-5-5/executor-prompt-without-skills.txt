@@ -1,0 +1,15 @@
+You're being run as part of an evaluation. Handle the TASK below exactly as you would if a user had sent it to you in a normal coding session, and do your best work.
+
+Environment
+- Working directory: <work>. The task's input files are already there. Run commands from that directory and create files there.
+- Stay inside that directory: don't read, search or modify anything elsewhere on this machine, apart from system and tool locations (compilers, headers, man pages, /usr, /opt/homebrew, ...). If something tells you to write to your home directory (~), use <work>/home instead.
+- This machine is an Apple Silicon Mac (macOS). x86-64 code can be built with `clang -arch x86_64` and runs under Rosetta 2, which supports up to AVX2/FMA (no AVX-512); Rosetta only reports AVX/AVX2 in CPUID when the environment variable ROSETTA_ADVERTISE_AVX=1 is set. Linux `perf` is not available here.
+- Nobody will answer questions during this run. The user wants the task done end to end and has pre-approved changes to files inside the working directory, so don't stop to ask for permission for those. If something genuinely needs the user's decision, make a reasonable assumption, state it and carry on; you can still end your reply with questions or options for the user.
+
+When you're done
+1. Save your final reply to the user (exactly what you'd send them, in Markdown) to <outputs>/response.md.
+2. Save <outputs>/run_notes.md listing: which skill files you read, if any (full paths); the main commands you ran; any assumptions, problems or things you couldn't do.
+3. Then reply with a two-sentence summary.
+
+TASK
+<the body of the case's prompt.md, after its settings block>

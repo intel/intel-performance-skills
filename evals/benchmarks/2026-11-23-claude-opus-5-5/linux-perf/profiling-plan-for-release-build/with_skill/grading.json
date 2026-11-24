@@ -1,0 +1,79 @@
+{
+  "expectations": [
+    {
+      "text": "The plan adds debug info without changing the optimization level being profiled: it keeps -O3 (e.g. adds -g to CMAKE_CXX_FLAGS or CMAKE_CXX_FLAGS_RELEASE) and does not switch to RelWithDebInfo or -O2, or, if it mentions RelWithDebInfo, it warns that this changes -O3 to -O2.",
+      "passed": true,
+      "evidence": "[blind LLM grader] response.md:40-41 runs 'cmake ... -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS=\"-g\"'. :45 says the lines become '-g -O3 -DNDEBUG', and :49 says 'Don't use RelWithDebInfo for this. It is -O2 -g, so you would be profiling a different binary.' The fallback at :65 correctly keeps the full value: -DCMAKE_CXX_FLAGS_RELEASE=\"-O3 -DNDEBUG -g\"."
+    },
+    {
+      "text": "The plan includes a step to check perf_event_paranoid (or otherwise check perf permissions) before collecting, and says what to do if it's too restrictive (run with sudo or lower the setting).",
+      "passed": true,
+      "evidence": "[blind LLM grader] response.md:21-22 saves 'sysctl kernel.perf_event_paranoid kernel.kptr_restrict' and runs 'sudo sysctl -w kernel.perf_event_paranoid=1 ...'. :31-33 explain that Ubuntu sets it above 2 (usually 4), which blocks non-root perf, and that 1 allows profiling your own processes. It also says 'If you'd rather not change sysctls, put sudo in front of every perf command'. There is a counter smoke test (:23), and step 7 restores the setting."
+    },
+    {
+      "text": "The plan includes a perf stat counting pass (cycles, instructions, cache and branch events) and explains how to read IPC and the miss rates from it.",
+      "passed": true,
+      "evidence": "[blind LLM grader] response.md:72 runs 'perf stat -e ...,cycles,instructions,branches,branch-misses,cache-references,cache-misses'. The table at :85-87 explains IPC thresholds (<1 stalled, 1-2.5 typical, >3 efficient), the branch-miss % (>3-5%), and the LLC cache-miss ratio plus misses per 1000 instructions (cache-misses / instructions x 1000; <1 low, >10 heavy)."
+    },
+    {
+      "text": "The plan includes perf record with call-graph collection that works on an -O3 build without frame pointers (`--call-graph dwarf` or `lbr`, or rebuilding with -fno-omit-frame-pointer) and perf report to rank the hot functions.",
+      "passed": true,
+      "evidence": "[blind LLM grader] response.md:99 runs 'perf record -F 499 --call-graph dwarf ...'. :102 explains that -O3 drops frame pointers, so -g/fp stacks would be broken, and :104 names lbr as an option. perf report ranks the functions: self list '--no-children -g none --sort dso,sym' (:117, described as 'the hotspot list' at :128), plus inclusive and callers reports."
+    },
+    {
+      "text": "The plan includes perf annotate (or perf report's annotate view) to drill into the hottest functions at the source-line or instruction level.",
+      "passed": true,
+      "evidence": "[blind LLM grader] Step 6 (:164-167) runs 'perf annotate -i prof/perf-cpu.data --stdio -l -s <exact symbol>' for each function at 20% or more (top 3-5), with the perf report 'a' alternative at :170. :172-180 explain reading the sorted source-line summary and hot instructions (loads, div, lock cmpxchg/xadd, scalar vs SIMD, calls in the loop)."
+    }
+  ],
+  "summary": {
+    "passed": 5,
+    "failed": 0,
+    "total": 5,
+    "pass_rate": 1.0
+  },
+  "execution_metrics": {
+    "tool_calls": {
+      "Bash": 12,
+      "Read": 8,
+      "Write": 2,
+      "Edit": 2
+    },
+    "total_tool_calls": 24,
+    "errors_encountered": 0
+  },
+  "timing": {
+    "total_duration_seconds": 6995.7
+  },
+  "user_notes_summary": {
+    "uncertainties": [],
+    "needs_review": [
+      "Saw its own case's grader file names in a directory listing of the skill folder (no file contents)."
+    ],
+    "workarounds": []
+  },
+  "eval_feedback": {
+    "suggestions": [],
+    "overall": "03-perf-stat-pass is the only assertion that separates A and B, and A fails it only on the literal 'cache events' wording. A judges memory-boundness with Intel Top-down instead (TopdownL1/L2, tma_memory_bound, step 8), which on Xeon is arguably the more reliable signal; B itself warns that the LLC cache-miss ratio is often misleadingly high on Xeon. Consider saying explicitly whether Top-down memory-bound metrics count as an alternative to raw cache-miss rates. 01-keeps-o3's example 'adds -g to ... CMAKE_CXX_FLAGS_RELEASE' could let a wrong plan through. Setting -DCMAKE_CXX_FLAGS_RELEASE=\"-g\" on the command line replaces the default '-O3 -DNDEBUG' and silently drops -O3. The assertion should require that the resulting flags still contain -O3 -DNDEBUG, as B's fallback at response.md:65 does."
+  },
+  "skill_files_read": [
+    "linux-perf",
+    "linux-perf/SKILL.md",
+    "linux-perf/references/flow-a.md",
+    "linux-perf/references/flow-b.md",
+    "linux-perf/references/building-blocks.md",
+    "linux-perf/references/flow-e.md",
+    "linux-perf/references/flow-c.md",
+    "performance-patterns",
+    "performance-patterns/SKILL.md",
+    "performance-patterns/triggers/from-profile.md",
+    "linux-perf/SKILL.md\\n-",
+    "linux-perf/references/flow-a.md\\n-",
+    "linux-perf/references/flow-b.md\\n-",
+    "linux-perf/references/building-blocks.md\\n-",
+    "linux-perf/references/flow-c.md\\n-",
+    "linux-perf/references/flow-e.md\\n\\nperformance-patterns",
+    "performance-patterns/SKILL.md\\n-",
+    "performance-patterns/triggers/from-profile.md\\n\\nNot"
+  ]
+}

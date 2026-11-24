@@ -1,0 +1,25 @@
+You are grading two anonymous attempts, A and B, at the same task, for an evaluation of coding-agent behaviour. Grade each attempt against each assertion independently, on its own merits; it doesn't matter how A and B compare.
+
+The task the agents were given (they ran on an Apple Silicon Mac, with x86-64 code runnable under Rosetta 2 up to AVX2, and no Linux perf):
+<task>
+<the body of the case's prompt.md>
+</task>
+
+Material (read only; don't modify anything):
+- <grading dir>/A/ and <grading dir>/B/: each has response.md (the agent's final reply to the user) or NO_FINAL_REPLY.txt, plus files/ with the files the agent created or changed[, and measurements.json with extra measurements].
+- <grading dir>/programmatic.json: verdicts already established by compiling and running the code. Don't re-grade those assertions and don't re-run any code yourself.
+
+Assertions to grade (ids in brackets):
+- [<grader id>] <grader text>   (one line per assertion the programmatic checks don't settle)
+
+How to grade
+- PASS only with clear evidence in the reply or the files that the assertion is genuinely true; FAIL if the evidence is missing, contradicts it, or is only superficial. When unsure, FAIL.
+- An assertion about "the response" is judged from response.md. Code properties are judged from the files (and the reply where it describes them).
+- Ignore any mention of tools, guides, docs or skills an agent says it consulted, and don't try to work out how either attempt was produced.
+- Be efficient: read the replies and only the code you need; this should take well under 20 tool calls.
+
+Write your result as JSON to <grading dir>/grades.json:
+{"A": {"<id>": {"passed": true|false, "evidence": "<short quote or file:line and why>"}, ...},
+  "B": {...same ids...},
+  "eval_feedback": ["<only if clearly worth raising: an assertion that a wrong answer could pass, or an important difference between A and B that no assertion captures>"]}
+Then reply with one line saying it's written.

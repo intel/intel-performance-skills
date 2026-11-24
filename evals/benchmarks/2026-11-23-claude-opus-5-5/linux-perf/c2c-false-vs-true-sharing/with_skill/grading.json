@@ -1,0 +1,85 @@
+{
+  "expectations": [
+    {
+      "text": "The response identifies g_wstats (the per-worker `struct worker_stats` array, the four ~13-15% lines) as false sharing: each worker writes its own element, but the 16-byte elements of 8 workers sit on the same 128-byte line at different offsets.",
+      "passed": true,
+      "evidence": "[blind LLM grader] response.md:5-7 'g_wstats[]: false sharing, 54.5% of HITMs ... struct worker_stats is 16 bytes, so 4 workers share every 64-byte cache line and 8 share every 128-byte pair. Each worker only writes its own entry'; :24 lists the four lines (14.62+13.95+13.20+12.77%) as g_wstats[0..31], 8 workers per 128 B; :58 '16 different offsets, and each one is written by a single CPU ... false sharing'."
+    },
+    {
+      "text": "The response identifies `g_state.inflight` (offset 0x0 of the 33.8% line, written by all 32 workers) as true sharing, and says padding or alignment alone won't fix it.",
+      "passed": true,
+      "evidence": "[blind LLM grader] response.md:9 'inflight (true sharing, 26.5%): all 32 workers do a lock inc and a lock dec on the single g_state.inflight counter'; :114 '+0x00 is true sharing. All 32 CPUs write the same offset ... Padding can't help here'; :14 'Padding ... cannot fix inflight'."
+    },
+    {
+      "text": "The response notices that the read-mostly `shutting_down` flag (offset 0x10, read in every worker's loop condition) shares that cache line with the constantly written `inflight` counter, and recommends moving it to a separate cache line.",
+      "passed": true,
+      "evidence": "[blind LLM grader] response.md:10 'shutting_down ... polled on every loop iteration and never written during the run. It sits 16 bytes from inflight on the same line'; :166-177 'Put shutting_down in a read-mostly block' with _Alignas(128) and total_conns in a separate block; implemented in files/stats.h:39-51."
+    },
+    {
+      "text": "The response recommends giving each worker's stats their own cache line (e.g. `alignas(64)` or padding `struct worker_stats` to 64 bytes or more, or per-thread allocation), with code.",
+      "passed": true,
+      "evidence": "[blind LLM grader] response.md:123-141 shows code: struct worker_stats with _Alignas(PKTSRV_CL_PAIR) (128) and _Static_assert(sizeof == 128), explaining 128 vs 64; implemented in files/stats.h:25-34."
+    },
+    {
+      "text": "The response recommends taking the shared atomic `inflight` counter off the per-packet path (e.g. per-worker counters that the monitor sums, batching, or dropping it), rather than only padding it.",
+      "passed": true,
+      "evidence": "[blind LLM grader] response.md:143-162 replaces the global inflight with a per-worker 'busy' flag the monitor sums ('If nobody actually looks at the inflight number, you can simply delete it'); files/pktsrv.c removes both atomic_fetch_add/sub on g_state.inflight and uses relaxed stores to ws->busy, which the monitor sums."
+    },
+    {
+      "text": "The response treats the remaining lines (each 3.1% of HITMs or less, e.g. the ring buffers and malloc's main_arena) as minor and doesn't recommend changes for them.",
+      "passed": true,
+      "evidence": "[blind LLM grader] response.md:200 'Below the 5% threshold (not the cause of your scaling problem)'; rings are 'the unavoidable handoff in a single-producer, single-consumer ring'; malloc 'You can ignore it for now'. 'What to change' covers only the three major issues; the one ring idea is explicitly optional ('If you want to trim this later: ... batched pops'), and no ring or malloc code was changed."
+    },
+    {
+      "text": "The response suggests re-running perf c2c and/or the thread-scaling benchmark after the change to confirm that the HITMs on these lines drop.",
+      "passed": true,
+      "evidence": "[blind LLM grader] response.md:185-196 'How to confirm the fix on the Xeon': rerun perf c2c record/report, expect the g_state and g_wstats entries to drop out of the table (<1% each), and run --threads 1, 4, 8, 16, 32 to check that pkts/s scales."
+    }
+  ],
+  "summary": {
+    "passed": 7,
+    "failed": 0,
+    "total": 7,
+    "pass_rate": 1.0
+  },
+  "execution_metrics": {
+    "tool_calls": {
+      "Read": 10,
+      "Bash": 19,
+      "Write": 5,
+      "Edit": 2
+    },
+    "total_tool_calls": 36,
+    "errors_encountered": 0
+  },
+  "timing": {
+    "total_duration_seconds": 6594.1
+  },
+  "user_notes_summary": {
+    "uncertainties": [],
+    "needs_review": [
+      "Saw its own case's grader file names in a directory listing of the skill folder (no file contents)."
+    ],
+    "workarounds": []
+  },
+  "eval_feedback": {
+    "suggestions": [],
+    "overall": "06 doesn't say whether an optional, deferred suggestion counts as recommending changes. A passed because its only ring idea is explicitly optional ('If you want to trim this later') and sits under a 'not the cause of your scaling problem' heading. B failed because it has a dedicated 'Still left' section with imperative ring changes and says they were 'not changed because ring.c wasn't attached'. Consider stating where that line is."
+  },
+  "skill_files_read": [
+    "linux-perf/SKILL.md",
+    "performance-patterns/SKILL.md",
+    "linux-perf/references/flow-c.md",
+    "linux-perf/references/building-blocks.md",
+    "performance-patterns",
+    "performance-patterns/triggers/from-profile.md",
+    "performance-patterns/patterns/false-sharing.md",
+    "performance-patterns/patterns/per-cpu-stats.md",
+    "linux-perf/SKILL.md\\n-",
+    "linux-perf/references/flow-c.md\\n-",
+    "performance-patterns/SKILL.md\\n-",
+    "performance-patterns/triggers/from-profile.md\\n-",
+    "performance-patterns/patterns/false-sharing.md\\n-",
+    "performance-patterns/patterns/per-cpu-stats.md\\n\\nListing"
+  ]
+}

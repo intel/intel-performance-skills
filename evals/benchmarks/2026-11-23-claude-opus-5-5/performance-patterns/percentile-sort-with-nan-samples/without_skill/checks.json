@@ -1,0 +1,17 @@
+{
+  "checks": [
+    {
+      "grader": "05-compiles",
+      "passed": true,
+      "evidence": "plain C++17 build: compiles and links"
+    },
+    {
+      "grader": "06-same-results",
+      "passed": true,
+      "evidence": "CPU without AVX: cases=9 fails=0 new_total_seconds=0.006\nAVX2 CPU: cases=9 fails=0 new_total_seconds=0.004"
+    }
+  ],
+  "info": {
+    "build": "plain C++17 build"
+  }
+}

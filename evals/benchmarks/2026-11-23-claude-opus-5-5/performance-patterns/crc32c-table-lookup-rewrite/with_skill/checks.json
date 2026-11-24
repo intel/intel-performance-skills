@@ -1,0 +1,42 @@
+{
+  "checks": [
+    {
+      "grader": "01-identical-checksums",
+      "passed": true,
+      "evidence": "CPU without AVX (SSE4.2+PCLMUL): cases=652 fails=0 | throughput_64k_GBps new=35.80 original=0.51 | throughput_4k_GBps new=35.33 original=0.51\nAVX2 CPU (no AVX-512): cases=652 fails=0 | throughput_64k_GBps new=65.77 original=0.51 | throughput_4k_GBps new=63.13 original=0.51"
+    }
+  ],
+  "info": {
+    "sources": [
+      "crc32c_fast.c"
+    ],
+    "throughput_noavx": [
+      "throughput_64k_GBps new=35.80 original=0.51",
+      "throughput_4k_GBps new=35.33 original=0.51"
+    ],
+    "throughput_avx2": [
+      "throughput_64k_GBps new=65.77 original=0.51",
+      "throughput_4k_GBps new=63.13 original=0.51"
+    ],
+    "functions_using_crc_or_wide_regs": {
+      "_crc32c_sse42": [
+        "crc32"
+      ],
+      "_crc32c_avx512": [
+        "crc32",
+        "pclmul",
+        "vzeroupper",
+        "ymm",
+        "zmm"
+      ],
+      "_crc32c_avx2": [
+        "crc32",
+        "pclmul"
+      ],
+      "_crc32c_pclmul": [
+        "crc32",
+        "pclmul"
+      ]
+    }
+  }
+}
